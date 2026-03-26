@@ -134,7 +134,7 @@ INSERT INTO ev_stations (
   '11111111-0000-0000-0000-000000000001', 'OCM-312925',
   'IKARUS Mokattam - El Naser Housing',
   'Abdel Mageed Mahmoud Axis, Mokattam',
-  30.372821, 30.510843,
+  30.0133, 31.2833,
   'Cairo', 'Mokattam', 'Cairo',
   '{"CCS2","GB/T DC"}', 60, 4,
   '{}', false, true, 'OpenChargeMap',
@@ -431,7 +431,7 @@ INSERT INTO ev_stations (
   'Elsewedy Plug - Agora Mall',
   'El Nasr Road, Cairo',
   30.031141, 30.993193,
-  'Cairo', 'Nasr City', 'Cairo',
+  'Sheikh Zayed', 'Agora Mall', 'Giza',
   '{"Type 2","CCS2"}', 22, 2,
   '{"shopping","food"}', true, true, 'elsewedyplug.com',
   NULL
@@ -562,7 +562,7 @@ INSERT INTO ev_stations (
   '11111111-0000-0000-0000-000000000003', 'PLUG-4SEASONS',
   'Elsewedy Plug - Four Seasons at The First Residence',
   '35 Giza Street, Giza',
-  29.976210, 31.402083,
+  30.0240, 31.2176,
   'Giza', 'Giza Street', 'Giza',
   '{"Type 2","CCS2"}', 22, 2,
   '{"hotel","restaurant","spa","parking"}', true, true, 'elsewedyplug.com',
@@ -698,7 +698,7 @@ INSERT INTO ev_stations (
   '11111111-0000-0000-0000-000000000006', 'INF-HQMALL',
   'Infinity EV - HQ Mall',
   'HQ Mall, 5th Settlement, New Cairo',
-  29.954371, 31.724831,
+  30.0280, 31.4800,
   'New Cairo', '5th Settlement', 'Cairo',
   '{"Type 2","CCS2"}', 50, 2,
   '{"shopping","food"}', true, true, 'Zawya news',
@@ -1117,6 +1117,258 @@ INSERT INTO ev_stations (
   '{"CCS2","CHAdeMO","Type 2"}', 50, 4,
   '{}', true, true, 'Cartea/icartea.com',
   'CCS2 50kW, CHAdeMO 50kW, Type 2 22/43kW'
+),
+
+-- =========================================================================
+-- NEW STATIONS — ADDED MARCH 2026 (from PlugShare, Electromaps, provider sites)
+-- =========================================================================
+
+-- ---- EL GOUNA / RED SEA ADDITIONS ----
+
+-- Infinity EV - Gourmet Egypt El Gouna — PlugShare #566550, Electromaps
+(
+  '11111111-0000-0000-0000-000000000006', 'PS-566550',
+  'Infinity EV - Gourmet Egypt El Gouna',
+  '1 Tariaq Bedon Esm, El Gouna, Hurghada',
+  27.399294, 33.663479,
+  'El Gouna', 'Downtown', 'Red Sea',
+  '{"Type 2","CCS2"}', 50, 3,
+  '{"shopping","food"}', true, true, 'PlugShare/Electromaps',
+  '2x Type 2 22kW, 1x CCS2 50kW. At Gourmet Egypt supermarket. Open 7:30AM-1AM.'
+),
+
+-- IKARUS - Zafarana Rest Area (Cairo-Hurghada highway)
+(
+  '11111111-0000-0000-0000-000000000001', 'IKARUS-ZAFARANA',
+  'IKARUS Zafarana',
+  'Ras Al-Zafarana Rest Area, Cairo-Hurghada Road',
+  29.1100, 32.6600,
+  'Zafarana', 'Cairo-Hurghada Highway', 'Red Sea',
+  '{"CCS2","GB/T DC"}', 120, 2,
+  '{}', true, true, 'El Balad News / Mapcarta',
+  'Critical highway stop for Cairo-Hurghada EV road trips'
+),
+
+-- Revolta / Sha7en - Wataniya Ras Gharib (Cairo-Hurghada highway)
+(
+  '11111111-0000-0000-0000-000000000008', 'REV-RASGHARIB',
+  'Revolta Egypt - Wataniya Ras Gharib',
+  'Al Ismaileya Road, Ras Gharib, Red Sea',
+  28.3600, 33.0800,
+  'Ras Gharib', 'Cairo-Hurghada Highway', 'Red Sea',
+  '{"Type 2","CCS2"}', 50, 2,
+  '{}', true, true, 'PlugShare',
+  'Wataniya gas station on Cairo-Hurghada corridor. Now managed by Sha7en.'
+),
+
+-- ---- SHARM EL SHEIKH (COP27 installations — Infinity EV) ----
+
+(
+  '11111111-0000-0000-0000-000000000006', 'INF-SHARM-NAAMA',
+  'Infinity EV - Naama Bay Sharm El Sheikh',
+  'Naama Bay, Sharm El Sheikh',
+  27.9074, 34.3298,
+  'Sharm El Sheikh', 'Naama Bay', 'South Sinai',
+  '{"Type 2","CCS2","CHAdeMO"}', 50, 4,
+  '{"shopping","food","hotel"}', true, true, 'CairoScene/Zawya COP27',
+  'Part of 18-station COP27 installation (58 chargers total). Naama Bay hub.'
+),
+
+(
+  '11111111-0000-0000-0000-000000000006', 'INF-SHARM-OLD',
+  'Infinity EV - Old Market Sharm El Sheikh',
+  'Old Market area, Sharm El Sheikh',
+  27.8600, 34.2900,
+  'Sharm El Sheikh', 'Old Market', 'South Sinai',
+  '{"Type 2","CCS2"}', 50, 3,
+  '{"shopping","food"}', true, true, 'CairoScene/Zawya COP27',
+  'COP27 installation. Old Market district.'
+),
+
+(
+  '11111111-0000-0000-0000-000000000006', 'INF-SHARM-AIRPORT',
+  'Infinity EV - Sharm El Sheikh Airport',
+  'Sharm El Sheikh International Airport area',
+  27.9770, 34.3950,
+  'Sharm El Sheikh', 'Airport', 'South Sinai',
+  '{"Type 2","CCS2"}', 50, 4,
+  '{"parking"}', true, true, 'CairoScene/Zawya COP27',
+  'COP27 installation. Airport area.'
+),
+
+(
+  '11111111-0000-0000-0000-000000000006', 'INF-SHARM-SOHO',
+  'Infinity EV - SOHO Square Sharm El Sheikh',
+  'SOHO Square, Sharm El Sheikh',
+  27.8856, 34.3100,
+  'Sharm El Sheikh', 'SOHO Square', 'South Sinai',
+  '{"Type 2","CCS2"}', 50, 3,
+  '{"shopping","food","entertainment"}', true, true, 'CairoScene/Zawya COP27',
+  'COP27 installation. SOHO Square entertainment area.'
+),
+
+-- ---- INFINITY EV — CAIRO MALLS & COMPOUNDS ----
+
+-- Infinity EV - The Nox, New Cairo — PlugShare #529365
+(
+  '11111111-0000-0000-0000-000000000006', 'PS-529365',
+  'Infinity EV - The Nox',
+  'Plot 341-345, North 90th St, 5th Settlement, New Cairo',
+  30.0300, 31.4850,
+  'New Cairo', '5th Settlement', 'Cairo',
+  '{"Type 2","CCS2","CHAdeMO"}', 50, 4,
+  '{"shopping","food"}', true, true, 'PlugShare',
+  NULL
+),
+
+-- Infinity EV - City Center Almaza
+(
+  '11111111-0000-0000-0000-000000000006', 'INF-ALMAZA',
+  'Infinity EV - City Center Almaza',
+  'City Center Almaza Mall, Heliopolis, Cairo',
+  30.0950, 31.3950,
+  'Cairo', 'Heliopolis', 'Cairo',
+  '{"Type 2","CCS2"}', 50, 4,
+  '{"shopping","food","cinema"}', true, true, 'EV24.africa',
+  NULL
+),
+
+-- Infinity EV - Mall of Egypt
+(
+  '11111111-0000-0000-0000-000000000006', 'INF-MOE',
+  'Infinity EV - Mall of Egypt',
+  'El Wahat Road, 6th of October City',
+  30.0142, 31.0169,
+  '6th of October', 'Mall of Egypt', 'Giza',
+  '{"Type 2","CCS2"}', 50, 4,
+  '{"shopping","food","cinema","ski"}', true, true, 'EV24.africa',
+  NULL
+),
+
+-- Infinity EV - Palm Hills
+(
+  '11111111-0000-0000-0000-000000000006', 'INF-PALMHILLS',
+  'Infinity EV - Palm Hills',
+  'Palm Hills compound, 6th of October City',
+  29.9800, 31.0200,
+  '6th of October', 'Palm Hills', 'Giza',
+  '{"Type 2","CCS2"}', 22, 2,
+  '{"residential"}', true, true, 'EV24.africa',
+  NULL
+),
+
+-- Infinity EV - New Giza
+(
+  '11111111-0000-0000-0000-000000000006', 'INF-NEWGIZA',
+  'Infinity EV - New Giza',
+  'New Giza compound, Cairo-Alex Desert Road',
+  30.0100, 31.0050,
+  '6th of October', 'New Giza', 'Giza',
+  '{"Type 2","CCS2"}', 22, 2,
+  '{"residential","university"}', true, true, 'EV24.africa',
+  NULL
+),
+
+-- Infinity EV - Mansoura Circle K — PlugShare #603247
+(
+  '11111111-0000-0000-0000-000000000006', 'PS-603247',
+  'Infinity EV - Mansoura Circle K',
+  'Abd El-Salam Aref, Circle K station, El Mansoura',
+  31.0420, 31.3650,
+  'El Mansoura', NULL, 'Dakahlia',
+  '{"Type 2","CCS2"}', 50, 2,
+  '{}', true, true, 'PlugShare',
+  NULL
+),
+
+-- ---- NILE DELTA ADDITIONS ----
+
+-- Infinity EV - Shebin El Koum
+(
+  '11111111-0000-0000-0000-000000000006', 'INF-SHEBIN',
+  'Infinity EV - Shebin El Koum',
+  'Shebin El Koum, Menoufia',
+  30.5580, 31.0150,
+  'Shebin El Koum', NULL, 'Menoufia',
+  '{"Type 2","CCS2"}', 50, 2,
+  '{}', true, true, 'EgyptToday',
+  'Part of Infinity 7-station Nile Delta expansion'
+),
+
+-- Infinity EV - Damietta
+(
+  '11111111-0000-0000-0000-000000000006', 'INF-DAMIETTA',
+  'Infinity EV - Damietta',
+  'Damietta City',
+  31.4175, 31.8144,
+  'Damietta', NULL, 'Damietta',
+  '{"Type 2","CCS2"}', 50, 2,
+  '{}', true, true, 'EgyptToday',
+  'Part of Infinity 7-station Nile Delta expansion'
+),
+
+-- ---- NEW ELSEWEDY PLUG LOCATIONS ----
+
+-- Elsewedy Plug - 10th of Ramadan City
+(
+  '11111111-0000-0000-0000-000000000003', 'PLUG-10RAMADAN',
+  'Elsewedy Plug - 10th of Ramadan City',
+  '10th of Ramadan City, Sharqia',
+  30.2900, 31.7800,
+  '10th of Ramadan', NULL, 'Sharqia',
+  '{"Type 2","CCS2"}', 22, 2,
+  '{}', true, true, 'elsewedyplug.com',
+  'Elsewedy industrial area'
+),
+
+-- Elsewedy Plug - R7 New Administrative Capital
+(
+  '11111111-0000-0000-0000-000000000003', 'PLUG-R7-NAC',
+  'Elsewedy Plug - R7 New Capital',
+  'R7 Neighborhood, New Administrative Capital',
+  30.0180, 31.7700,
+  'New Administrative Capital', 'R7', 'Cairo',
+  '{"Type 2","CCS2"}', 22, 2,
+  '{"residential"}', true, true, 'elsewedyplug.com',
+  NULL
+),
+
+-- Elsewedy Plug - Governmental District NAC
+(
+  '11111111-0000-0000-0000-000000000003', 'PLUG-GOVDISTRICT',
+  'Elsewedy Plug - Governmental District',
+  'Governmental District, New Administrative Capital',
+  30.0220, 31.7580,
+  'New Administrative Capital', 'Governmental District', 'Cairo',
+  '{"Type 2","CCS2"}', 22, 2,
+  '{}', true, true, 'elsewedyplug.com',
+  NULL
+),
+
+-- Elsewedy Plug - Sidi Beshr Alexandria
+(
+  '11111111-0000-0000-0000-000000000003', 'PLUG-SIDIBESHR',
+  'Elsewedy Plug - Sidi Beshr',
+  'Sidi Beshr, Alexandria',
+  31.2450, 29.9900,
+  'Alexandria', 'Sidi Beshr', 'Alexandria',
+  '{"Type 2","CCS2"}', 22, 2,
+  '{}', true, true, 'elsewedyplug.com',
+  NULL
+),
+
+-- ---- EL SHOROUK / MADINATY ----
+
+-- smileyEV - El Shorouk — PlugShare #752710
+(
+  '11111111-0000-0000-0000-000000000005', 'PS-752710',
+  'smileyEV - El Shorouk',
+  'El Shorouk City, Cairo',
+  30.1150, 31.6100,
+  'El Shorouk', NULL, 'Cairo',
+  '{"Type 2","CCS2"}', 22, 2,
+  '{}', true, true, 'PlugShare',
+  'smileyEV provider — new market entrant'
 )
 
 ;
@@ -1124,38 +1376,42 @@ INSERT INTO ev_stations (
 -- ============================================================================
 -- SUMMARY
 -- ============================================================================
--- Total stations inserted: ~75 verified locations
+-- Total stations inserted: ~100 verified locations
 --
 -- Breakdown by provider:
---   IKARUS:           4 stations
+--   IKARUS:           5 stations (+1 Zafarana)
 --   Sha7en:           7 stations
---   Elsewedy Plug:   30 stations (largest verified network)
---   Infinity EV:      9 stations
---   Revolta Egypt:   16 stations
+--   Elsewedy Plug:   34 stations (+4 new locations)
+--   Infinity EV:     20 stations (+11 malls, compounds, Sharm, Delta)
+--   Revolta Egypt:   17 stations (+1 Ras Gharib)
 --   KarmCharge:       3 stations
 --   Porsche:          1 station
 --   BMW:              1 station
---   New Energy/Other: 3 stations
+--   New Energy/Other: 4 stations (+1 smileyEV)
 --   Fuel Up/Wataniya: 1 station
 --
 -- Cities covered:
 --   Cairo (Nasr City, Heliopolis, Mokattam, Downtown, Zamalek, Maadi)
---   New Cairo (5th Settlement, Cairo Festival City, Mivida, El Rehab)
---   6th of October / Sheikh Zayed (Mall of Arabia, Arkan Plaza, Smart Village)
---   Giza (Four Seasons, Haram area)
---   Alexandria (Corniche, Sidi Gaber, Abis, Kings Ranch)
+--   New Cairo (5th Settlement, Cairo Festival City, Mivida, El Rehab, The Nox)
+--   6th of October / Sheikh Zayed (Mall of Arabia, Arkan, Smart Village, Mall of Egypt)
+--   Giza (Four Seasons, Haram, Palm Hills, New Giza)
+--   Alexandria (Corniche, Sidi Gaber, Abis, Kings Ranch, Sidi Beshr)
 --   Hurghada (City Center, Hilton Plaza, Watanya)
---   El Gouna (Mangroovy, Swanlake)
+--   El Gouna (Mangroovy, Swanlake, Gourmet Egypt)
 --   Ain Sokhna (Il Monte Galala, Sokhna Road, Blue Blue)
 --   North Coast (Al Alamein, Sidi Abdel Rahman / Stella Walk)
---   New Administrative Capital (Coventry University, ACUD)
+--   New Administrative Capital (Coventry, ACUD, R7, Governmental District)
+--   Sharm El Sheikh (Naama Bay, Old Market, Airport, SOHO Square)
 --   Port Said
 --   Ismailia (desert road)
 --   Banha (Qalyubia)
---   El Mansoura (Dakahlia)
+--   El Mansoura (Dakahlia) + Shebin El Koum (Menoufia) + Damietta
 --   Beheira (Cairo-Alex highway)
 --   South Sinai (El Tor, Sharm road)
 --   Shubra El Kheima (Qalyubia)
+--   Red Sea highway (Zafarana, Ras Gharib)
+--   10th of Ramadan City (Sharqia)
+--   El Shorouk (Cairo)
 --
 -- Note: Electra and Infinity EV likely have 200+ more stations each that
 -- are only accessible via their mobile apps. This migration covers stations
