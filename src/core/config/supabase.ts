@@ -2,8 +2,8 @@ import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://plpwojwnzueigukmjidw.supabase.co';
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBscHdvanduenVlaWd1a21qaWR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NTM3NjMsImV4cCI6MjA5MDEyOTc2M30.EL5xCe0Xp2CEUAoyLfawkllgBcc5V8gNsbISiXACV-g';
 
 const ExpoSecureStoreAdapter = {
   getItem: (key: string) => {
