@@ -1,10 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
-import { stationService, StationFilter } from '../services/stationService';
+import { stationService, StationFilter, StationQueryOptions } from '../services/stationService';
 
-export function useStations(filter?: StationFilter) {
+export function useStations(
+  filter?: StationFilter,
+  location?: { latitude: number; longitude: number } | null,
+  radiusKm?: number
+) {
+  const options: StationQueryOptions = {
+    filter,
+    latitude: location?.latitude,
+    longitude: location?.longitude,
+    radiusKm,
+  };
+
   return useQuery({
-    queryKey: ['stations', filter],
-    queryFn: () => stationService.getStations(filter),
+    queryKey: ['stations', filter, location?.latitude, location?.longitude, radiusKm],
+    queryFn: () => stationService.getStations(options),
     staleTime: 1000 * 60 * 5,
   });
 }

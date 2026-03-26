@@ -15,27 +15,36 @@ import type { Station } from '@/core/types/station';
 export function MapScreen({ navigation }: any) {
   const { region, searchQuery, filters, setRegion, setSearchQuery, setFilters } = useMapStore();
   const [showFilter, setShowFilter] = useState(false);
-  const { data: stations, isLoading } = useStations(filters);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(
+    null
+  );
 
+  // Get user location on mount
   useEffect(() => {
     (async () => {
       const granted = await locationService.requestPermission();
       if (granted) {
         const loc = await locationService.getCurrentLocation();
+        setUserLocation(loc);
         setRegion({ ...DEFAULT_MAP_REGION, latitude: loc.latitude, longitude: loc.longitude });
       }
     })();
   }, []);
 
-  const stationsWithDistance = (stations || [])
-    .map((s) => ({
+  // Pass user location to the station query for OCM proximity search
+  const { data: stations, isLoading } = useStations(filters, userLocation);
+
+  // Stations already come sorted by distance from the service when location is provided
+  const displayStations = (stations || []).map((s) => {
+    if (s.distance_km != null) return s;
+    return {
       ...s,
       distance_km: locationService.getDistanceKm(
         { latitude: region.latitude, longitude: region.longitude },
         { latitude: s.latitude, longitude: s.longitude }
       ),
-    }))
-    .sort((a, b) => a.distance_km - b.distance_km);
+    };
+  });
 
   const handleStationPress = useCallback(
     (station: Station) => {
@@ -44,7 +53,7 @@ export function MapScreen({ navigation }: any) {
     [navigation]
   );
 
-  if (isLoading) return <LoadingScreen message="Loading stations..." />;
+  if (isLoading) return <LoadingScreen message="Loading real station data..." />;
 
   return (
     <View style={styles.container}>
@@ -56,7 +65,7 @@ export function MapScreen({ navigation }: any) {
         showsUserLocation
         showsMyLocationButton
       >
-        {stationsWithDistance.map((station) => (
+        {displayStations.map((station) => (
           <Marker
             key={station.id}
             coordinate={{ latitude: station.latitude, longitude: station.longitude }}
@@ -78,7 +87,7 @@ export function MapScreen({ navigation }: any) {
       </View>
       <View style={styles.bottomSheet}>
         <StationBottomSheet
-          stations={stationsWithDistance.slice(0, 20)}
+          stations={displayStations.slice(0, 20)}
           onStationPress={handleStationPress}
         />
       </View>

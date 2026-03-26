@@ -31,8 +31,10 @@ export function MapScreen({ navigation }: any) {
   const { searchQuery, filters, setSearchQuery, setFilters } = useMapStore();
   const [showFilter, setShowFilter] = useState(false);
   const [listExpanded, setListExpanded] = useState(false);
-  const { data: stations, isLoading } = useStations(filters);
   const userLocation = useWebLocation();
+
+  // Pass user location to the query so OCM returns proximity-sorted results
+  const { data: stations, isLoading, error } = useStations(filters, userLocation);
 
   const handleStationPress = useCallback(
     (station: Station) => {
@@ -53,9 +55,12 @@ export function MapScreen({ navigation }: any) {
     );
   });
 
-  if (isLoading) return <LoadingScreen message="Loading stations..." />;
+  if (isLoading) return <LoadingScreen message="Loading real station data..." />;
 
   const listData = filteredStations.slice(0, listExpanded ? 40 : 8);
+
+  // Build the panel title based on context
+  const panelTitle = buildPanelTitle(filteredStations, searchQuery, userLocation);
 
   return (
     <View style={styles.container}>
@@ -85,24 +90,32 @@ export function MapScreen({ navigation }: any) {
           activeOpacity={0.7}
         >
           <View style={styles.handle} />
-          <Text style={styles.panelTitle}>
-            {filteredStations.length} station{filteredStations.length !== 1 ? 's' : ''}
-            {searchQuery ? ` for "${searchQuery}"` : ' in Cairo'}
-          </Text>
-          <Text style={styles.expandHint}>{listExpanded ? 'Show less ▲' : 'Show more ▼'}</Text>
+          <Text style={styles.panelTitle}>{panelTitle}</Text>
+          <Text style={styles.expandHint}>{listExpanded ? 'Show less' : 'Show more'}</Text>
         </TouchableOpacity>
 
-        <FlatList
-          data={listData}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <StationListItem station={item} onPress={() => handleStationPress(item)} />
-          )}
-          contentContainerStyle={{ paddingBottom: spacing.xl }}
-          showsVerticalScrollIndicator={false}
-          scrollEnabled={listExpanded}
-          keyboardShouldPersistTaps="handled"
-        />
+        {filteredStations.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyTitle}>No stations found</Text>
+            <Text style={styles.emptySubtitle}>
+              {searchQuery
+                ? `No results for "${searchQuery}". Try a different search.`
+                : 'No EV charging stations found within 200 km. More stations are being added to Egypt regularly.'}
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={listData}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <StationListItem station={item} onPress={() => handleStationPress(item)} />
+            )}
+            contentContainerStyle={{ paddingBottom: spacing.xl }}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={listExpanded}
+            keyboardShouldPersistTaps="handled"
+          />
+        )}
       </View>
 
       <FilterModal
@@ -114,6 +127,42 @@ export function MapScreen({ navigation }: any) {
     </View>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function buildPanelTitle(
+  stations: Station[],
+  searchQuery: string,
+  userLocation: { latitude: number; longitude: number } | null
+): string {
+  const count = stations.length;
+  const noun = count === 1 ? 'station' : 'stations';
+
+  if (searchQuery) {
+    return `${count} ${noun} for "${searchQuery}"`;
+  }
+
+  if (count === 0) {
+    return 'No stations nearby';
+  }
+
+  // If we have distances, describe proximity
+  const nearest = stations[0];
+  if (nearest?.distance_km != null && userLocation) {
+    if (nearest.distance_km < 50) {
+      return `${count} ${noun} near you`;
+    }
+    return `${count} ${noun} in Egypt (nearest ${Math.round(nearest.distance_km)} km away)`;
+  }
+
+  return `${count} ${noun} in Egypt`;
+}
+
+// ---------------------------------------------------------------------------
+// Styles
+// ---------------------------------------------------------------------------
 
 const LIST_PANEL_DEFAULT = 280;
 const LIST_PANEL_EXPANDED = 520;
@@ -183,5 +232,21 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.primary,
     fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  emptyTitle: {
+    ...typography.bodyBold,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  emptySubtitle: {
+    ...typography.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });
