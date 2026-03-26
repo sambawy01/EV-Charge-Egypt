@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import React, { useEffect, useId, useMemo } from 'react';
+import { Platform } from 'react-native';
 import type { Station } from '@/core/types/station';
 
 interface Props {
@@ -8,7 +8,6 @@ interface Props {
   userLocation?: { latitude: number; longitude: number } | null;
 }
 
-// Status-to-hex colour mapping (matches app theme)
 const STATUS_COLOR: Record<string, string> = {
   available: '#10B981',
   partial: '#F59E0B',
@@ -16,16 +15,13 @@ const STATUS_COLOR: Record<string, string> = {
   offline: '#9CA3AF',
 };
 
-function buildMapHtml(
-  stations: Station[],
-  userLocation: { latitude: number; longitude: number } | null
-): string {
+function buildMapHtml(stations: Station[]): string {
   const markersJson = JSON.stringify(
     stations.map((s) => ({
       id: s.id,
       name: s.name,
       address: s.address ?? '',
-      provider: s.provider?.name ?? '',
+      provider: (s as any).provider?.name ?? '',
       latitude: s.latitude,
       longitude: s.longitude,
       status: s.status ?? 'offline',
@@ -33,247 +29,93 @@ function buildMapHtml(
     }))
   );
 
-  const userMarkerScript = userLocation
-    ? `
-    L.circleMarker([${userLocation.latitude}, ${userLocation.longitude}], {
-      radius: 8,
-      fillColor: '#3B82F6',
-      color: '#fff',
-      weight: 2,
-      fillOpacity: 1,
-    })
-      .addTo(map)
-      .bindPopup('<b>Your Location</b>');
-    `
-    : '';
-
   return `<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; background: #f0fdf4; }
-    #map { width: 100%; height: 100%; }
-    .station-popup .leaflet-popup-content-wrapper {
-      border-radius: 12px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-      padding: 0;
-      overflow: hidden;
-    }
-    .station-popup .leaflet-popup-content { margin: 0; }
-    .popup-inner {
-      padding: 12px 16px;
-      min-width: 180px;
-    }
-    .popup-name {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 14px;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 4px;
-    }
-    .popup-provider {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 12px;
-      color: #6B7280;
-      margin-bottom: 2px;
-    }
-    .popup-address {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 12px;
-      color: #9CA3AF;
-      margin-bottom: 8px;
-    }
-    .popup-status {
-      display: inline-block;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 999px;
-      color: #fff;
-      text-transform: capitalize;
-    }
-    .popup-btn {
-      display: block;
-      margin-top: 8px;
-      text-align: center;
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      font-size: 13px;
-      font-weight: 600;
-      color: #10B981;
-      cursor: pointer;
-      text-decoration: none;
-    }
-    .leaflet-attribution-flag { display: none !important; }
-  </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#map{width:100%;height:100%}
+.popup-name{font-weight:700;font-size:14px;margin-bottom:4px}
+.popup-provider{font-size:12px;color:#6B7280;margin-bottom:2px}
+.popup-address{font-size:11px;color:#9CA3AF;margin-bottom:6px}
+.popup-status{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#fff}
+</style>
 </head>
 <body>
-  <div id="map"></div>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    var stations = ${markersJson};
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/script>
+<script>
+var stations=${markersJson};
+var map=L.map('map').setView([30.0444,31.2357],11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
 
-    var defaultCenter = [30.0444, 31.2357]; // Cairo fallback
-    var defaultZoom = 11;
+// Plot stations
+stations.forEach(function(s){
+  L.circleMarker([s.latitude,s.longitude],{
+    radius:10,fillColor:s.color,color:'#fff',weight:2,fillOpacity:0.9
+  }).addTo(map).bindPopup(
+    '<div class="popup-name">'+s.name+'</div>'+
+    '<div class="popup-provider">'+s.provider+'</div>'+
+    (s.address?'<div class="popup-address">'+s.address+'</div>':'')+
+    '<span class="popup-status" style="background:'+s.color+'">'+s.status+'</span>'
+  );
+});
 
-    var map = L.map('map', {
-      zoomControl: true,
-      attributionControl: true,
-    }).setView(defaultCenter, defaultZoom);
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(map);
-
-    // Center on user's actual location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(function(pos) {
-        var userLat = pos.coords.latitude;
-        var userLng = pos.coords.longitude;
-        map.setView([userLat, userLng], 13);
-
-        // Blue dot for user location
-        L.circleMarker([userLat, userLng], {
-          radius: 10,
-          fillColor: '#3B82F6',
-          color: '#fff',
-          weight: 3,
-          fillOpacity: 1,
-        }).addTo(map).bindPopup('<b>You are here</b>');
-
-        // Pulsing effect
-        L.circle([userLat, userLng], {
-          radius: 100,
-          fillColor: '#3B82F6',
-          color: '#3B82F6',
-          weight: 1,
-          fillOpacity: 0.15,
-        }).addTo(map);
-      }, function() {
-        // Location denied — stay on Cairo
-      }, { timeout: 8000 });
-    }
-
-    var STATUS_LABELS = {
-      available: 'Available',
-      partial: 'Partial',
-      occupied: 'Busy',
-      offline: 'Offline',
-    };
-
-    stations.forEach(function(station) {
-      var statusLabel = STATUS_LABELS[station.status] || station.status;
-      var popupHtml =
-        '<div class="popup-inner">' +
-          '<div class="popup-name">' + station.name + '</div>' +
-          '<div class="popup-provider">' + station.provider + '</div>' +
-          (station.address ? '<div class="popup-address">' + station.address + '</div>' : '') +
-          '<span class="popup-status" style="background:' + station.color + '">' + statusLabel + '</span>' +
-          '<a class="popup-btn" href="#" onclick="selectStation(' + JSON.stringify(station.id) + '); return false;">View Details &rarr;</a>' +
-        '</div>';
-
-      var marker = L.circleMarker([station.latitude, station.longitude], {
-        radius: 11,
-        fillColor: station.color,
-        color: '#ffffff',
-        weight: 2.5,
-        fillOpacity: 0.92,
-      }).addTo(map);
-
-      marker.bindPopup(popupHtml, { className: 'station-popup', maxWidth: 240 });
-      marker._stationId = station.id;
-
-      marker.on('click', function() {
-        marker.openPopup();
-      });
-    });
-
-    function selectStation(id) {
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'stationPress', id: id }));
-      } else if (window.parent !== window) {
-        window.parent.postMessage(JSON.stringify({ type: 'stationPress', id: id }), '*');
-      }
-    }
-
-    // Auto-fit map to show all markers if there are stations
-    if (stations.length > 0) {
-      var bounds = L.latLngBounds(stations.map(function(s) {
-        return [s.latitude, s.longitude];
-      }));
-      map.fitBounds(bounds, { padding: [40, 40] });
-    }
-  </script>
+// Get user location and center map on it
+if(navigator.geolocation){
+  navigator.geolocation.getCurrentPosition(function(pos){
+    var lat=pos.coords.latitude,lng=pos.coords.longitude;
+    map.setView([lat,lng],13);
+    L.circleMarker([lat,lng],{radius:8,fillColor:'#3B82F6',color:'#fff',weight:3,fillOpacity:1}).addTo(map).bindPopup('<b>You are here</b>').openPopup();
+    L.circle([lat,lng],{radius:200,fillColor:'#3B82F6',color:'#3B82F6',weight:1,fillOpacity:0.1}).addTo(map);
+  },function(){},{ timeout:10000 });
+}
+<\/script>
 </body>
 </html>`;
 }
 
 export function WebMap({ stations, onStationPress, userLocation }: Props) {
-  const containerRef = useRef<any>(null);
+  const containerId = 'ev-map-' + useId().replace(/:/g, '');
 
-  const htmlContent = useMemo(
-    () => buildMapHtml(stations, userLocation ?? null),
-    [stations, userLocation]
-  );
+  const html = useMemo(() => buildMapHtml(stations), [stations]);
 
-  // Listen for messages from the iframe (station press)
   useEffect(() => {
-    if (!onStationPress) return;
-    const handler = (event: MessageEvent) => {
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (data?.type === 'stationPress' && data?.id) {
-          const station = stations.find((s) => s.id === data.id);
-          if (station) onStationPress(station);
-        }
-      } catch {}
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [stations, onStationPress]);
+    if (Platform.OS !== 'web') return;
 
-  // Directly inject iframe via DOM for maximum compatibility
-  useEffect(() => {
-    if (typeof window === 'undefined' || !containerRef.current) return;
-    const container = containerRef.current as HTMLElement;
-    // Clear previous
-    container.innerHTML = '';
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    // Remove old iframe
+    const old = container.querySelector('iframe');
+    if (old) old.remove();
+
+    // Create iframe
     const iframe = document.createElement('iframe');
-    iframe.style.width = '100%';
-    iframe.style.height = '100%';
-    iframe.style.border = 'none';
-    iframe.style.display = 'block';
-    iframe.setAttribute('title', 'EV Charging Stations Map');
-    iframe.setAttribute('allow', 'geolocation');
+    iframe.style.cssText = 'width:100%;height:100%;border:none;display:block;';
+    iframe.title = 'EV Stations Map';
+    iframe.allow = 'geolocation';
     container.appendChild(iframe);
-    // Write HTML directly into iframe
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+
+    // Write content
+    const doc = iframe.contentDocument;
     if (doc) {
       doc.open();
-      doc.write(htmlContent);
+      doc.write(html);
       doc.close();
     }
-  }, [htmlContent]);
+  }, [html, containerId]);
 
-  if (typeof window === 'undefined') {
-    return <View style={styles.placeholder} />;
-  }
+  if (Platform.OS !== 'web') return null;
 
-  return <View ref={containerRef} style={styles.container} />;
+  // Use dangerouslySetInnerHTML to create a real DOM div that we can target by ID
+  return (
+    <div
+      id={containerId}
+      style={{ width: '100%', height: '100%', minHeight: 400 }}
+    />
+  );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    overflow: 'hidden' as any,
-  },
-  placeholder: {
-    flex: 1,
-    backgroundColor: '#f0fdf4',
-  },
-});
