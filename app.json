@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "EV Charge Egypt",
+    "slug": "ev-charge-egypt",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "evcharge",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F0FDF4"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.evchargeegypt.app",
+      "config": {
+        "googleMapsApiKey": "YOUR_KEY"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundColor": "#10B981"
+      },
+      "package": "com.evchargeegypt.app",
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_KEY"
+        }
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-location",
+      "expo-notifications",
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-font"
+    ]
+  }
+}
