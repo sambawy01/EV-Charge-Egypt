@@ -52,8 +52,7 @@ function buildMapHtml(
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; height: 100%; background: #f0fdf4; }
@@ -114,10 +113,7 @@ function buildMapHtml(
 </head>
 <body>
   <div id="map"></div>
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs="
-    crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     var stations = ${markersJson};
 
@@ -188,28 +184,12 @@ function buildMapHtml(
 }
 
 export function WebMap({ stations, onStationPress, userLocation }: Props) {
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const containerRef = useRef<any>(null);
 
   const htmlContent = useMemo(
     () => buildMapHtml(stations, userLocation ?? null),
     [stations, userLocation]
   );
-
-  // Use a blob URL to avoid iframe srcdoc issues with large HTML
-  const blobUrl = useMemo(() => {
-    if (typeof window === 'undefined') return '';
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    return URL.createObjectURL(blob);
-  }, [htmlContent]);
-
-  // Cleanup blob URL on unmount or when it changes
-  useEffect(() => {
-    return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
-    };
-  }, [blobUrl]);
 
   // Listen for messages from the iframe (station press)
   useEffect(() => {
@@ -219,42 +199,42 @@ export function WebMap({ stations, onStationPress, userLocation }: Props) {
         const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (data?.type === 'stationPress' && data?.id) {
           const station = stations.find((s) => s.id === data.id);
-          if (station) {
-            onStationPress(station);
-          }
+          if (station) onStationPress(station);
         }
-      } catch {
-        // ignore non-JSON messages
-      }
+      } catch {}
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
   }, [stations, onStationPress]);
 
-  if (typeof window === 'undefined' || !blobUrl) {
+  // Directly inject iframe via DOM for maximum compatibility
+  useEffect(() => {
+    if (typeof window === 'undefined' || !containerRef.current) return;
+    const container = containerRef.current as HTMLElement;
+    // Clear previous
+    container.innerHTML = '';
+    const iframe = document.createElement('iframe');
+    iframe.style.width = '100%';
+    iframe.style.height = '100%';
+    iframe.style.border = 'none';
+    iframe.style.display = 'block';
+    iframe.setAttribute('title', 'EV Charging Stations Map');
+    iframe.setAttribute('allow', 'geolocation');
+    container.appendChild(iframe);
+    // Write HTML directly into iframe
+    const doc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+    }
+  }, [htmlContent]);
+
+  if (typeof window === 'undefined') {
     return <View style={styles.placeholder} />;
   }
 
-  // Cast to any to use native DOM iframe element inside React Native Web
-  const IframeElement = 'iframe' as any;
-
-  return (
-    <View style={styles.container}>
-      <IframeElement
-        ref={iframeRef}
-        src={blobUrl}
-        style={{
-          width: '100%',
-          height: '100%',
-          border: 'none',
-          display: 'block',
-        }}
-        title="EV Charging Stations Map"
-        allow="geolocation"
-        sandbox="allow-scripts allow-same-origin"
-      />
-    </View>
-  );
+  return <View ref={containerRef} style={styles.container} />;
 }
 
 const styles = StyleSheet.create({
