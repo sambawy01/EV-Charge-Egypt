@@ -117,15 +117,47 @@ function buildMapHtml(
   <script>
     var stations = ${markersJson};
 
+    var defaultCenter = [30.0444, 31.2357]; // Cairo fallback
+    var defaultZoom = 11;
+
     var map = L.map('map', {
       zoomControl: true,
       attributionControl: true,
-    }).setView([30.0444, 31.2357], 11);
+    }).setView(defaultCenter, defaultZoom);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
+
+    // Center on user's actual location
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        var userLat = pos.coords.latitude;
+        var userLng = pos.coords.longitude;
+        map.setView([userLat, userLng], 13);
+
+        // Blue dot for user location
+        L.circleMarker([userLat, userLng], {
+          radius: 10,
+          fillColor: '#3B82F6',
+          color: '#fff',
+          weight: 3,
+          fillOpacity: 1,
+        }).addTo(map).bindPopup('<b>You are here</b>');
+
+        // Pulsing effect
+        L.circle([userLat, userLng], {
+          radius: 100,
+          fillColor: '#3B82F6',
+          color: '#3B82F6',
+          weight: 1,
+          fillOpacity: 0.15,
+        }).addTo(map);
+      }, function() {
+        // Location denied — stay on Cairo
+      }, { timeout: 8000 });
+    }
 
     var STATUS_LABELS = {
       available: 'Available',
@@ -160,8 +192,6 @@ function buildMapHtml(
         marker.openPopup();
       });
     });
-
-    ${userMarkerScript}
 
     function selectStation(id) {
       if (window.ReactNativeWebView) {
