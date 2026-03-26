@@ -2,6 +2,8 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '@/core/theme/colors';
+
+// Existing screens
 import { MapScreen } from '@/driver/screens/MapScreen';
 import { StationDetailScreen } from '@/driver/screens/StationDetailScreen';
 import { BookingScreen } from '@/driver/screens/BookingScreen';
@@ -12,10 +14,24 @@ import { WalletScreen } from '@/driver/screens/WalletScreen';
 import { TopUpScreen } from '@/driver/screens/TopUpScreen';
 import { TransactionHistoryScreen } from '@/driver/screens/TransactionHistoryScreen';
 
+// Plan 5: AI Layer screens
+import { AIAssistantScreen } from '@/driver/screens/AIAssistantScreen';
+import { RouteResultScreen } from '@/driver/screens/RouteResultScreen';
+import { CostReportScreen } from '@/driver/screens/CostReportScreen';
+
+// Plan 6: Driver Profile screens
+import { ProfileScreen } from '@/driver/screens/ProfileScreen';
+import { VehicleScreen } from '@/driver/screens/VehicleScreen';
+import { AddVehicleScreen } from '@/driver/screens/AddVehicleScreen';
+import { FavoritesScreen } from '@/driver/screens/FavoritesScreen';
+import { SettingsScreen } from '@/driver/screens/SettingsScreen';
+
 const Tab = createBottomTabNavigator();
 const MapStack = createNativeStackNavigator();
 const BookingsStack = createNativeStackNavigator();
 const WalletStack = createNativeStackNavigator();
+const AIStack = createNativeStackNavigator();
+const ProfileStack = createNativeStackNavigator();
 
 function MapTabStack() {
   return (
@@ -23,10 +39,7 @@ function MapTabStack() {
       <MapStack.Screen name="Map" component={MapScreen} />
       <MapStack.Screen name="StationDetail" component={StationDetailScreen} />
       <MapStack.Screen name="Booking" component={BookingScreen} />
-      <MapStack.Screen
-        name="ChargingSession"
-        component={ChargingSessionScreen}
-      />
+      <MapStack.Screen name="ChargingSession" component={ChargingSessionScreen} />
       <MapStack.Screen name="BookingDetail" component={BookingDetailScreen} />
     </MapStack.Navigator>
   );
@@ -35,18 +48,9 @@ function MapTabStack() {
 function BookingsTabStack() {
   return (
     <BookingsStack.Navigator screenOptions={{ headerShown: false }}>
-      <BookingsStack.Screen
-        name="BookingsList"
-        component={BookingsListScreen}
-      />
-      <BookingsStack.Screen
-        name="BookingDetail"
-        component={BookingDetailScreen}
-      />
-      <BookingsStack.Screen
-        name="ChargingSession"
-        component={ChargingSessionScreen}
-      />
+      <BookingsStack.Screen name="BookingsList" component={BookingsListScreen} />
+      <BookingsStack.Screen name="BookingDetail" component={BookingDetailScreen} />
+      <BookingsStack.Screen name="ChargingSession" component={ChargingSessionScreen} />
       <BookingsStack.Screen name="BookingsTab" component={BookingsListScreen} />
     </BookingsStack.Navigator>
   );
@@ -57,47 +61,30 @@ function WalletTabStack() {
     <WalletStack.Navigator screenOptions={{ headerShown: false }}>
       <WalletStack.Screen name="Wallet" component={WalletScreen} />
       <WalletStack.Screen name="TopUp" component={TopUpScreen} />
-      <WalletStack.Screen
-        name="TransactionHistory"
-        component={TransactionHistoryScreen}
-      />
+      <WalletStack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
     </WalletStack.Navigator>
   );
 }
 
-function AITabPlaceholder() {
-  const { View, Text } = require('react-native');
+function AITabStack() {
   return (
-    <View
-      style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.background,
-      }}
-    >
-      <Text style={{ fontSize: 18, color: colors.textSecondary }}>
-        AI Assistant — Coming Soon
-      </Text>
-    </View>
+    <AIStack.Navigator screenOptions={{ headerShown: false }}>
+      <AIStack.Screen name="AIAssistant" component={AIAssistantScreen} />
+      <AIStack.Screen name="RouteResult" component={RouteResultScreen} />
+      <AIStack.Screen name="CostReport" component={CostReportScreen} />
+    </AIStack.Navigator>
   );
 }
 
-function ProfileTabPlaceholder() {
-  const { View, Text } = require('react-native');
+function ProfileTabStack() {
   return (
-    <View
-      style={{
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: colors.background,
-      }}
-    >
-      <Text style={{ fontSize: 18, color: colors.textSecondary }}>
-        Profile — Coming Soon
-      </Text>
-    </View>
+    <ProfileStack.Navigator screenOptions={{ headerShown: false }}>
+      <ProfileStack.Screen name="Profile" component={ProfileScreen} />
+      <ProfileStack.Screen name="Vehicle" component={VehicleScreen} />
+      <ProfileStack.Screen name="AddVehicle" component={AddVehicleScreen} />
+      <ProfileStack.Screen name="Favorites" component={FavoritesScreen} />
+      <ProfileStack.Screen name="Settings" component={SettingsScreen} />
+    </ProfileStack.Navigator>
   );
 }
 
@@ -123,7 +110,7 @@ export function DriverNavigator() {
       />
       <Tab.Screen
         name="AITab"
-        component={AITabPlaceholder}
+        component={AITabStack}
         options={{ tabBarLabel: 'AI' }}
       />
       <Tab.Screen
@@ -133,7 +120,7 @@ export function DriverNavigator() {
       />
       <Tab.Screen
         name="ProfileTab"
-        component={ProfileTabPlaceholder}
+        component={ProfileTabStack}
         options={{ tabBarLabel: 'Profile' }}
       />
     </Tab.Navigator>
