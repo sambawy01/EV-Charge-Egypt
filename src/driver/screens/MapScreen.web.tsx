@@ -12,28 +12,34 @@ import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 import type { Station } from '@/core/types/station';
 
-// Attempt to get user location on web via the browser Geolocation API
+// Get user location — returns null while loading, then the location or a fallback
 function useWebLocation() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [resolved, setResolved] = useState(false);
   useEffect(() => {
-    if (!navigator?.geolocation) return;
+    if (!navigator?.geolocation) {
+      setResolved(true);
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
-      (pos) =>
-        setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      () => null,
-      { timeout: 8000, maximumAge: 60000 }
+      (pos) => {
+        setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+        setResolved(true);
+      },
+      () => setResolved(true), // denied or error — proceed without location
+      { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
     );
   }, []);
-  return location;
+  return { location, resolved };
 }
 
 export function MapScreen({ navigation }: any) {
   const { searchQuery, filters, setSearchQuery, setFilters } = useMapStore();
   const [showFilter, setShowFilter] = useState(false);
   const [listExpanded, setListExpanded] = useState(false);
-  const userLocation = useWebLocation();
+  const { location: userLocation, resolved: gpsResolved } = useWebLocation();
 
-  // Pass user location to the query so OCM returns proximity-sorted results
+  // Pass user location to the query so results are proximity-sorted
   const { data: stations, isLoading, error } = useStations(filters, userLocation);
 
   const handleStationPress = useCallback(
@@ -55,7 +61,8 @@ export function MapScreen({ navigation }: any) {
     );
   });
 
-  if (isLoading) return <LoadingScreen message="Loading real station data..." />;
+  // Wait for GPS before rendering the map so it centers on the user
+  if (!gpsResolved || isLoading) return <LoadingScreen message="Finding your location..." />;
 
   const listData = filteredStations.slice(0, listExpanded ? 40 : 8);
 
