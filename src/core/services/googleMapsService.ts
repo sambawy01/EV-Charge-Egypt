@@ -1,6 +1,19 @@
 const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || '';
 const DIRECTIONS_BASE = 'https://maps.googleapis.com/maps/api/directions/json';
 const PLACES_BASE = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
+const AUTOCOMPLETE_BASE = 'https://maps.googleapis.com/maps/api/place/autocomplete/json';
+
+// Egyptian cities for instant offline suggestions
+const EGYPT_CITIES = [
+  'Cairo', 'Alexandria', 'Hurghada', 'Sharm El Sheikh', 'Ain Sokhna',
+  'El Gouna', 'Luxor', 'Aswan', 'Port Said', 'Ismailia', 'Suez',
+  'Dahab', 'Marsa Alam', 'Ras Sudr', 'El Alamein', 'North Coast',
+  'New Cairo', '6th of October', 'Sheikh Zayed', 'Madinaty',
+  'New Administrative Capital', '10th of Ramadan', 'Banha', 'Tanta',
+  'El Mansoura', 'Damietta', 'Zagazig', 'Fayoum', 'Minya', 'Asyut',
+  'Sohag', 'Qena', 'Safaga', 'Soma Bay', 'Makadi Bay',
+  'Marina El Alamein', 'Stella Di Mare', 'Galala', 'Sokhna',
+];
 
 export interface DirectionsResult {
   totalDistanceKm: number;
@@ -163,6 +176,42 @@ export const googleMapsService = {
       console.error('[googleMapsService] Places fetch failed:', err);
       return [];
     }
+  },
+
+  // Autocomplete city/place suggestions
+  async autocompletePlaces(query: string): Promise<{ description: string; placeId: string }[]> {
+    if (!query || query.length < 2) return [];
+
+    // Always include local matches first (instant, no API call)
+    const localMatches = EGYPT_CITIES
+      .filter((c) => c.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 4)
+      .map((c) => ({ description: `${c}, Egypt`, placeId: `local-${c}` }));
+
+    // Try Google Autocomplete API for richer results
+    if (GOOGLE_MAPS_KEY) {
+      try {
+        const url = `${AUTOCOMPLETE_BASE}?input=${encodeURIComponent(query)}&components=country:eg&types=(cities)&key=${GOOGLE_MAPS_KEY}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        if (data.status === 'OK' && data.predictions?.length) {
+          const googleResults = data.predictions.slice(0, 5).map((p: any) => ({
+            description: p.description,
+            placeId: p.place_id,
+          }));
+          // Merge: local first (deduped), then google
+          const seen = new Set(localMatches.map((m) => m.description.split(',')[0].toLowerCase()));
+          const uniqueGoogle = googleResults.filter(
+            (g: any) => !seen.has(g.description.split(',')[0].toLowerCase())
+          );
+          return [...localMatches, ...uniqueGoogle].slice(0, 6);
+        }
+      } catch {
+        // CORS or network error — return local only
+      }
+    }
+
+    return localMatches;
   },
 
   // Find stations from our database that are near the route

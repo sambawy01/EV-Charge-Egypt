@@ -77,6 +77,10 @@ export function TripPlannerScreen({ navigation }: any) {
   const [step, setStep] = useState<Step>(1);
   const [from, setFrom] = useState('Cairo');
   const [to, setTo] = useState('');
+  const [fromSuggestions, setFromSuggestions] = useState<{ description: string; placeId: string }[]>([]);
+  const [toSuggestions, setToSuggestions] = useState<{ description: string; placeId: string }[]>([]);
+  const [activeField, setActiveField] = useState<'from' | 'to' | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [batteryLevel, setBatteryLevel] = useState(80);
   const [avgSpeed, setAvgSpeed] = useState(120);
   const [chargingStrategy, setChargingStrategy] = useState<ChargingStrategy>('quick');
@@ -519,6 +523,38 @@ export function TripPlannerScreen({ navigation }: any) {
   // Handlers
   // ---------------------------------------------------------------------------
 
+  const handleFromChange = (text: string) => {
+    setFrom(text);
+    setActiveField('from');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const results = await googleMapsService.autocompletePlaces(text);
+      setFromSuggestions(results);
+    }, 200);
+  };
+
+  const handleToChange = (text: string) => {
+    setTo(text);
+    setActiveField('to');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const results = await googleMapsService.autocompletePlaces(text);
+      setToSuggestions(results);
+    }, 200);
+  };
+
+  const selectSuggestion = (field: 'from' | 'to', description: string) => {
+    const city = description.split(',')[0].trim();
+    if (field === 'from') {
+      setFrom(city);
+      setFromSuggestions([]);
+    } else {
+      setTo(city);
+      setToSuggestions([]);
+    }
+    setActiveField(null);
+  };
+
   const handlePlanTrip = () => {
     if (!to.trim()) {
       Alert.alert('Destination Required', 'Please enter a destination to plan your trip.');
@@ -575,25 +611,65 @@ export function TripPlannerScreen({ navigation }: any) {
           }}
         >
           {/* From */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Text style={{ fontSize: 18 }}>{'\uD83D\uDCCD'}</Text>
-            <TextInput
-              value={from}
-              onChangeText={setFrom}
-              placeholder="From"
-              placeholderTextColor={colors.textTertiary}
-              style={{
-                flex: 1,
-                ...typography.body,
-                color: colors.text,
-                backgroundColor: colors.surfaceSecondary,
-                borderRadius: 10,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
+          <View style={{ zIndex: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={{ fontSize: 18 }}>{'\uD83D\uDCCD'}</Text>
+              <TextInput
+                value={from}
+                onChangeText={handleFromChange}
+                onFocus={() => setActiveField('from')}
+                onBlur={() => setTimeout(() => { if (activeField === 'from') setActiveField(null); }, 200)}
+                placeholder="From"
+                placeholderTextColor={colors.textTertiary}
+                style={{
+                  flex: 1,
+                  ...typography.body,
+                  color: colors.text,
+                  backgroundColor: colors.surfaceSecondary,
+                  borderRadius: 10,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  borderWidth: 1,
+                  borderColor: activeField === 'from' ? colors.primary : colors.border,
+                }}
+              />
+            </View>
+            {activeField === 'from' && fromSuggestions.length > 0 && (
+              <View style={{
+                position: 'absolute',
+                top: 52,
+                left: 38,
+                right: 0,
+                backgroundColor: colors.surface,
                 borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            />
+                borderColor: colors.primary,
+                borderRadius: 10,
+                overflow: 'hidden',
+                shadowColor: colors.primary,
+                shadowOpacity: 0.2,
+                shadowRadius: 10,
+                elevation: 10,
+              }}>
+                {fromSuggestions.map((s, i) => (
+                  <TouchableOpacity
+                    key={s.placeId + i}
+                    onPress={() => selectSuggestion('from', s.description)}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 11,
+                      borderBottomWidth: i < fromSuggestions.length - 1 ? 1 : 0,
+                      borderBottomColor: colors.border,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={{ color: colors.primary, fontSize: 13 }}>{'\uD83D\uDCCD'}</Text>
+                    <Text style={{ ...typography.caption, color: colors.text, flex: 1 }} numberOfLines={1}>{s.description}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
           {/* Separator */}
           <View
@@ -604,25 +680,65 @@ export function TripPlannerScreen({ navigation }: any) {
             }}
           />
           {/* To */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Text style={{ fontSize: 18 }}>{'\uD83C\uDFC1'}</Text>
-            <TextInput
-              value={to}
-              onChangeText={setTo}
-              placeholder="Destination"
-              placeholderTextColor={colors.textTertiary}
-              style={{
-                flex: 1,
-                ...typography.body,
-                color: colors.text,
-                backgroundColor: colors.surfaceSecondary,
-                borderRadius: 10,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
+          <View style={{ zIndex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Text style={{ fontSize: 18 }}>{'\uD83C\uDFC1'}</Text>
+              <TextInput
+                value={to}
+                onChangeText={handleToChange}
+                onFocus={() => setActiveField('to')}
+                onBlur={() => setTimeout(() => { if (activeField === 'to') setActiveField(null); }, 200)}
+                placeholder="Destination"
+                placeholderTextColor={colors.textTertiary}
+                style={{
+                  flex: 1,
+                  ...typography.body,
+                  color: colors.text,
+                  backgroundColor: colors.surfaceSecondary,
+                  borderRadius: 10,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  borderWidth: 1,
+                  borderColor: activeField === 'to' ? colors.primary : colors.border,
+                }}
+              />
+            </View>
+            {activeField === 'to' && toSuggestions.length > 0 && (
+              <View style={{
+                position: 'absolute',
+                top: 52,
+                left: 38,
+                right: 0,
+                backgroundColor: colors.surface,
                 borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            />
+                borderColor: colors.primary,
+                borderRadius: 10,
+                overflow: 'hidden',
+                shadowColor: colors.primary,
+                shadowOpacity: 0.2,
+                shadowRadius: 10,
+                elevation: 10,
+              }}>
+                {toSuggestions.map((s, i) => (
+                  <TouchableOpacity
+                    key={s.placeId + i}
+                    onPress={() => selectSuggestion('to', s.description)}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 11,
+                      borderBottomWidth: i < toSuggestions.length - 1 ? 1 : 0,
+                      borderBottomColor: colors.border,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={{ color: colors.secondary, fontSize: 13 }}>{'\uD83C\uDFC1'}</Text>
+                    <Text style={{ ...typography.caption, color: colors.text, flex: 1 }} numberOfLines={1}>{s.description}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
         </View>
 
