@@ -89,78 +89,69 @@ function ProfileTabStack() {
   );
 }
 
-function SideTabBar({ state, descriptors, navigation }: any) {
+function InlineTabs({ state, descriptors, navigation }: any) {
   const { colors } = useTheme();
 
-  const icons: Record<string, string> = {
-    MapTab: '\u{1F4CD}',
-    BookingsTab: '\u{1F4CB}',
-    AITab: '\u{1F916}',
-    WalletTab: '\u{1F4B3}',
-    ProfileTab: '\u{1F464}',
-  };
-
-  const labels: Record<string, string> = {
-    MapTab: 'Map',
-    BookingsTab: 'Bookings',
-    AITab: 'AI',
-    WalletTab: 'Wallet',
-    ProfileTab: 'Profile',
-  };
+  const tabs = [
+    { name: 'MapTab', icon: '\u{1F4CD}', label: 'Map' },
+    { name: 'BookingsTab', icon: '\u{1F4CB}', label: 'Bookings' },
+    { name: 'AITab', icon: '\u{1F916}', label: 'AI' },
+    { name: 'WalletTab', icon: '\u{1F4B3}', label: 'Wallet' },
+    { name: 'ProfileTab', icon: '\u{1F464}', label: 'Profile' },
+  ];
 
   return (
-    <View
-      style={{
-        width: 72,
-        backgroundColor: colors.surface,
-        borderRightWidth: 1,
-        borderRightColor: colors.border,
-        paddingTop: 48,
-        paddingBottom: 24,
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        gap: 8,
-      }}
-    >
-      {/* Brand mark */}
-      <Text style={{ fontSize: 24, marginBottom: 24 }}>{'\u26A1'}</Text>
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      gap: 2,
+    }}>
+      {/* Brand */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
+        <Text style={{ fontSize: 20 }}>{'\u26A1'}</Text>
+        <Text style={{
+          fontFamily: 'SpaceGrotesk-Bold',
+          fontSize: 15,
+          color: colors.primary,
+          marginLeft: 6,
+        }}>EV Charge</Text>
+      </View>
 
-      {state.routes.map((route: any, index: number) => {
-        const isFocused = state.index === index;
-        const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
+      {/* Spacer */}
+      <View style={{ flex: 1 }} />
 
+      {/* Nav tabs */}
+      {tabs.map((tab) => {
+        const routeIndex = state.routes.findIndex((r: any) => r.name === tab.name);
+        const isFocused = state.index === routeIndex;
         return (
           <TouchableOpacity
-            key={route.key}
-            onPress={onPress}
+            key={tab.name}
+            onPress={() => {
+              if (!isFocused) navigation.navigate(tab.name);
+            }}
             style={{
-              width: 56,
-              height: 56,
-              borderRadius: 12,
+              flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 8,
               backgroundColor: isFocused ? colors.primaryLight : 'transparent',
+              gap: 5,
             }}
           >
-            <Text style={{ fontSize: 20 }}>{icons[route.name] || '\u25CF'}</Text>
-            <Text
-              style={{
-                fontSize: 9,
-                marginTop: 2,
-                color: isFocused ? colors.primary : colors.textTertiary,
-                fontWeight: isFocused ? '600' : '400',
-              }}
-            >
-              {labels[route.name] || route.name}
+            <Text style={{ fontSize: 14 }}>{tab.icon}</Text>
+            <Text style={{
+              fontSize: 12,
+              color: isFocused ? colors.primary : colors.textTertiary,
+              fontWeight: isFocused ? '600' : '400',
+            }}>
+              {tab.label}
             </Text>
           </TouchableOpacity>
         );
@@ -170,23 +161,16 @@ function SideTabBar({ state, descriptors, navigation }: any) {
 }
 
 export function DriverNavigator() {
-  const { colors } = useTheme();
-
   return (
-    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.background }}>
-      <Tab.Navigator
-        tabBar={(props) => <SideTabBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-        }}
-        sceneContainerStyle={{ flex: 1 }}
-      >
-        <Tab.Screen name="MapTab" component={MapTabStack} />
-        <Tab.Screen name="BookingsTab" component={BookingsTabStack} />
-        <Tab.Screen name="AITab" component={AITabStack} />
-        <Tab.Screen name="WalletTab" component={WalletTabStack} />
-        <Tab.Screen name="ProfileTab" component={ProfileTabStack} />
-      </Tab.Navigator>
-    </View>
+    <Tab.Navigator
+      tabBar={(props) => <InlineTabs {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="MapTab" component={MapTabStack} />
+      <Tab.Screen name="BookingsTab" component={BookingsTabStack} />
+      <Tab.Screen name="AITab" component={AITabStack} />
+      <Tab.Screen name="WalletTab" component={WalletTabStack} />
+      <Tab.Screen name="ProfileTab" component={ProfileTabStack} />
+    </Tab.Navigator>
   );
 }

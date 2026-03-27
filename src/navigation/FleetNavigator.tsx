@@ -75,78 +75,69 @@ function SettingsStack() {
   );
 }
 
-function FleetSideTabBar({ state, descriptors, navigation }: any) {
+function InlineTabs({ state, descriptors, navigation }: any) {
   const { colors } = useTheme();
 
-  const icons: Record<string, string> = {
-    FleetHome: '\u{1F4CA}',
-    VehiclesTab: '\u{1F697}',
-    ScheduleTab: '\u{1F4C5}',
-    ReportsTab: '\u{1F4C8}',
-    SettingsTab: '\u2699\uFE0F',
-  };
-
-  const labels: Record<string, string> = {
-    FleetHome: 'Dashboard',
-    VehiclesTab: 'Vehicles',
-    ScheduleTab: 'Schedule',
-    ReportsTab: 'Reports',
-    SettingsTab: 'Settings',
-  };
+  const tabs = [
+    { name: 'FleetHome', icon: '\u{1F4CA}', label: 'Dashboard' },
+    { name: 'VehiclesTab', icon: '\u{1F697}', label: 'Vehicles' },
+    { name: 'ScheduleTab', icon: '\u{1F4C5}', label: 'Schedule' },
+    { name: 'ReportsTab', icon: '\u{1F4C8}', label: 'Reports' },
+    { name: 'SettingsTab', icon: '\u2699\uFE0F', label: 'Settings' },
+  ];
 
   return (
-    <View
-      style={{
-        width: 72,
-        backgroundColor: colors.surface,
-        borderRightWidth: 1,
-        borderRightColor: colors.border,
-        paddingTop: 48,
-        paddingBottom: 24,
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        gap: 8,
-      }}
-    >
-      {/* Brand mark */}
-      <Text style={{ fontSize: 24, marginBottom: 24 }}>{'\u26A1'}</Text>
+    <View style={{
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      gap: 2,
+    }}>
+      {/* Brand */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
+        <Text style={{ fontSize: 20 }}>{'\u26A1'}</Text>
+        <Text style={{
+          fontFamily: 'SpaceGrotesk-Bold',
+          fontSize: 15,
+          color: colors.primary,
+          marginLeft: 6,
+        }}>EV Fleet</Text>
+      </View>
 
-      {state.routes.map((route: any, index: number) => {
-        const isFocused = state.index === index;
-        const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
+      {/* Spacer */}
+      <View style={{ flex: 1 }} />
 
+      {/* Nav tabs */}
+      {tabs.map((tab) => {
+        const routeIndex = state.routes.findIndex((r: any) => r.name === tab.name);
+        const isFocused = state.index === routeIndex;
         return (
           <TouchableOpacity
-            key={route.key}
-            onPress={onPress}
+            key={tab.name}
+            onPress={() => {
+              if (!isFocused) navigation.navigate(tab.name);
+            }}
             style={{
-              width: 56,
-              height: 56,
-              borderRadius: 12,
+              flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'center',
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 8,
               backgroundColor: isFocused ? colors.primaryLight : 'transparent',
+              gap: 5,
             }}
           >
-            <Text style={{ fontSize: 20 }}>{icons[route.name] || '\u25CF'}</Text>
-            <Text
-              style={{
-                fontSize: 9,
-                marginTop: 2,
-                color: isFocused ? colors.primary : colors.textTertiary,
-                fontWeight: isFocused ? '600' : '400',
-              }}
-            >
-              {labels[route.name] || route.name}
+            <Text style={{ fontSize: 14 }}>{tab.icon}</Text>
+            <Text style={{
+              fontSize: 12,
+              color: isFocused ? colors.primary : colors.textTertiary,
+              fontWeight: isFocused ? '600' : '400',
+            }}>
+              {tab.label}
             </Text>
           </TouchableOpacity>
         );
@@ -156,23 +147,16 @@ function FleetSideTabBar({ state, descriptors, navigation }: any) {
 }
 
 export function FleetNavigator() {
-  const { colors } = useTheme();
-
   return (
-    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.background }}>
-      <Tab.Navigator
-        tabBar={(props) => <FleetSideTabBar {...props} />}
-        screenOptions={{
-          headerShown: false,
-        }}
-        sceneContainerStyle={{ flex: 1 }}
-      >
-        <Tab.Screen name="FleetHome" component={DashboardStack} />
-        <Tab.Screen name="VehiclesTab" component={VehiclesStack} />
-        <Tab.Screen name="ScheduleTab" component={ScheduleStack} />
-        <Tab.Screen name="ReportsTab" component={ReportsStack} />
-        <Tab.Screen name="SettingsTab" component={SettingsStack} />
-      </Tab.Navigator>
-    </View>
+    <Tab.Navigator
+      tabBar={(props) => <InlineTabs {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      <Tab.Screen name="FleetHome" component={DashboardStack} />
+      <Tab.Screen name="VehiclesTab" component={VehiclesStack} />
+      <Tab.Screen name="ScheduleTab" component={ScheduleStack} />
+      <Tab.Screen name="ReportsTab" component={ReportsStack} />
+      <Tab.Screen name="SettingsTab" component={SettingsStack} />
+    </Tab.Navigator>
   );
 }
