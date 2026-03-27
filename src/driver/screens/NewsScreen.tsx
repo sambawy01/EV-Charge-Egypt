@@ -1,13 +1,14 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  Alert,
   StyleSheet,
   Dimensions,
   Image,
+  ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/core/theme';
@@ -18,11 +19,10 @@ import { useVehicles } from '@/core/queries/useVehicles';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type CategoryFilter = 'all' | 'egypt' | 'global' | 'tech' | 'market' | 'review';
+type CategoryFilter = 'all' | 'global' | 'tech' | 'market' | 'review';
 
 const CATEGORIES: { key: CategoryFilter; label: string }[] = [
   { key: 'all', label: 'ALL' },
-  { key: 'egypt', label: 'EGYPT' },
   { key: 'global', label: 'GLOBAL' },
   { key: 'tech', label: 'TECH' },
   { key: 'market', label: 'MARKET' },
@@ -30,7 +30,6 @@ const CATEGORIES: { key: CategoryFilter; label: string }[] = [
 ];
 
 const CATEGORY_COLORS: Record<string, string> = {
-  egypt: '#00FF88',
   global: '#00D4FF',
   tech: '#D946EF',
   market: '#FFB020',
@@ -38,10 +37,9 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
-  egypt: '\u{1F1EA}\u{1F1EC} EGYPT',
-  global: '\u{1F30D} GLOBAL',
-  tech: '\u{1F52C} TECH',
-  market: '\u{1F4CA} MARKET',
+  global: '\uD83C\uDF0D GLOBAL',
+  tech: '\uD83D\uDD2C TECH',
+  market: '\uD83D\uDCCA MARKET',
   review: '\u2B50 REVIEW',
 };
 
@@ -107,6 +105,33 @@ function CategoryPill({ category }: { category: string }) {
   );
 }
 
+// -- Fallback Image wrapper that handles load errors --
+function ArticleImage({
+  uri,
+  fallbackId,
+  style,
+  resizeMode = 'cover',
+}: {
+  uri: string;
+  fallbackId: string;
+  style: any;
+  resizeMode?: 'cover' | 'contain' | 'stretch';
+}) {
+  const [failed, setFailed] = useState(false);
+  const source = failed
+    ? { uri: `https://picsum.photos/seed/${encodeURIComponent(fallbackId)}/800/400` }
+    : { uri };
+
+  return (
+    <Image
+      source={source}
+      style={style}
+      resizeMode={resizeMode}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 // -- Hero Article --
 function HeroArticle({
   article,
@@ -118,10 +143,10 @@ function HeroArticle({
   const { colors } = useTheme();
   return (
     <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.heroContainer}>
-      <Image
-        source={{ uri: article.image }}
+      <ArticleImage
+        uri={article.image}
+        fallbackId={article.id}
         style={styles.heroImage}
-        resizeMode="cover"
       />
       {article.videoUrl && <VideoOverlay />}
       <LinearGradient
@@ -165,7 +190,7 @@ function HeroArticle({
           {article.trending && (
             <View style={styles.trendingBadge}>
               <Text style={styles.trendingBadgeText}>
-                {'\u{1F525}'} TRENDING
+                {'\uD83D\uDD25'} TRENDING
               </Text>
             </View>
           )}
@@ -202,10 +227,10 @@ function TrendingCard({
       >
         <View style={[styles.trendingCardInner, { backgroundColor: colors.surface }]}>
           <View style={styles.trendingImageWrap}>
-            <Image
-              source={{ uri: article.image }}
+            <ArticleImage
+              uri={article.image}
+              fallbackId={article.id}
               style={styles.trendingImage}
-              resizeMode="cover"
             />
             {article.videoUrl && <VideoOverlay />}
           </View>
@@ -246,7 +271,7 @@ function TrendingCard({
             </View>
             {article.aiPick && (
               <View style={styles.aiPickPill}>
-                <Text style={styles.aiPickText}>{'\u{1F916}'} AI PICK</Text>
+                <Text style={styles.aiPickText}>{'\uD83E\uDD16'} AI PICK</Text>
               </View>
             )}
           </View>
@@ -277,10 +302,10 @@ function EditorialCardA({
         },
       ]}
     >
-      <Image
-        source={{ uri: article.image }}
+      <ArticleImage
+        uri={article.image}
+        fallbackId={article.id}
         style={styles.editorialAImage}
-        resizeMode="cover"
       />
       <View style={styles.editorialAContent}>
         <CategoryPill category={article.category} />
@@ -326,10 +351,10 @@ function EditorialCardB({
 }) {
   return (
     <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.editorialB}>
-      <Image
-        source={{ uri: article.image }}
+      <ArticleImage
+        uri={article.image}
+        fallbackId={article.id}
         style={styles.editorialBImage}
-        resizeMode="cover"
       />
       {article.videoUrl && <VideoOverlay />}
       <View style={styles.editorialBPillWrap}>
@@ -385,10 +410,10 @@ function TechCard({
         { backgroundColor: colors.surface, borderColor: colors.surfaceTertiary },
       ]}
     >
-      <Image
-        source={{ uri: article.image }}
+      <ArticleImage
+        uri={article.image}
+        fallbackId={article.id}
         style={styles.techCardImage}
-        resizeMode="cover"
       />
       <View style={styles.techCardContent}>
         <Text
@@ -415,31 +440,49 @@ export function NewsScreen() {
   const { colors } = useTheme();
   const { data: vehicles } = useVehicles();
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
+  const [articles, setArticles] = useState<NewsArticle[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const userVehicleMake = vehicles?.[0]?.make;
 
-  const allArticles = useMemo(
-    () => newsService.getDailyFeed(userVehicleMake),
-    [userVehicleMake],
-  );
+  // Fetch articles when category or vehicle changes
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
 
-  const filteredArticles = useMemo(() => {
-    if (activeCategory === 'all') return allArticles;
-    return allArticles.filter((a) => a.category === activeCategory);
-  }, [allArticles, activeCategory]);
+    const fetchArticles = async () => {
+      try {
+        let data: NewsArticle[];
+        if (activeCategory === 'all') {
+          data = await newsService.getDailyFeed(userVehicleMake);
+        } else {
+          data = await newsService.getByCategory(activeCategory, userVehicleMake);
+        }
+        if (!cancelled) {
+          setArticles(data);
+          setLoading(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
 
-  // Derive sections
-  const heroArticle = filteredArticles[0] || null;
-  const trendingArticles = allArticles.filter((a) => a.trending);
-  const editorsPicks = filteredArticles.filter((a) => a.aiPick || !a.trending).slice(0, 4);
-  const techArticles = allArticles.filter((a) => a.category === 'tech').slice(0, 4);
+    fetchArticles();
+    return () => { cancelled = true; };
+  }, [activeCategory, userVehicleMake]);
+
+  // Derive sections from fetched articles
+  const heroArticle = articles[0] || null;
+  const trendingArticles = articles.filter((a) => a.trending);
+  const editorsPicks = articles.filter((a) => a.aiPick || !a.trending).slice(0, 4);
+  const techArticles = articles.filter((a) => a.category === 'tech').slice(0, 4);
 
   const handleArticlePress = useCallback((article: NewsArticle) => {
-    Alert.alert(
-      article.title,
-      `${article.summary}\n\nSource: ${article.source}\nRead time: ${article.readTimeMin} min\nCategory: ${article.category}`,
-      [{ text: 'Close', style: 'cancel' }],
-    );
+    if (article.url) {
+      Linking.openURL(article.url);
+    }
   }, []);
 
   const todayFormatted = new Date().toLocaleDateString('en-US', {
@@ -486,8 +529,28 @@ export function NewsScreen() {
         />
       </View>
 
+      {/* ===== Loading State ===== */}
+      {loading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#00D4FF" />
+          <Text
+            style={[
+              typography.caption,
+              {
+                color: colors.textTertiary,
+                marginTop: 12,
+                textTransform: 'uppercase',
+                letterSpacing: 2,
+              },
+            ]}
+          >
+            Fetching live articles...
+          </Text>
+        </View>
+      )}
+
       {/* ===== Hero Article ===== */}
-      {heroArticle && (
+      {!loading && heroArticle && (
         <HeroArticle
           article={heroArticle}
           onPress={() => handleArticlePress(heroArticle)}
@@ -537,7 +600,7 @@ export function NewsScreen() {
       </ScrollView>
 
       {/* ===== Trending Now ===== */}
-      {trendingArticles.length > 0 && (
+      {!loading && trendingArticles.length > 0 && (
         <>
           <SectionHeader title="TRENDING NOW" />
           <ScrollView
@@ -559,7 +622,7 @@ export function NewsScreen() {
       )}
 
       {/* ===== Editor's Picks ===== */}
-      {editorsPicks.length > 0 && (
+      {!loading && editorsPicks.length > 0 && (
         <>
           <SectionHeader title="EDITOR'S PICKS" />
           <View style={styles.editorialSection}>
@@ -583,7 +646,7 @@ export function NewsScreen() {
       )}
 
       {/* ===== Tech & Innovation ===== */}
-      {techArticles.length > 0 && (
+      {!loading && techArticles.length > 0 && (
         <>
           <SectionHeader title="TECH & INNOVATION" />
           <View style={styles.techGrid}>
@@ -596,6 +659,15 @@ export function NewsScreen() {
             ))}
           </View>
         </>
+      )}
+
+      {/* ===== No Articles State ===== */}
+      {!loading && articles.length === 0 && (
+        <View style={styles.emptyContainer}>
+          <Text style={[typography.body, { color: colors.textSecondary, textAlign: 'center' }]}>
+            No articles found. Pull down to refresh.
+          </Text>
+        </View>
       )}
 
       {/* ===== Community Footer ===== */}
@@ -657,6 +729,20 @@ const styles = StyleSheet.create({
   content: {
     paddingTop: 60,
     paddingBottom: 40,
+  },
+
+  // Loading
+  loadingContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Empty
+  emptyContainer: {
+    paddingVertical: 40,
+    paddingHorizontal: 40,
+    alignItems: 'center',
   },
 
   // Magazine Header
