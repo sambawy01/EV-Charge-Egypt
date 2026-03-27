@@ -11,6 +11,7 @@ import { useStationDetail } from '@/core/queries/useStationDetail';
 import { Header, Card, Button, LoadingScreen } from '@/core/components';
 import { ConnectorRow } from '../components/ConnectorRow';
 import { AmenityBadge } from '../components/AmenityBadge';
+import { StationRating } from '../components/StationRating';
 import { colors } from '@/core/theme/colors';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
@@ -37,10 +38,13 @@ export function StationDetailScreen({ route, navigation }: any) {
         <Card style={styles.infoCard}>
           <Text style={styles.providerName}>{station.provider?.name}</Text>
           <Text style={styles.address}>{station.address}</Text>
-          <View style={styles.statsRow}>
-            <Text style={styles.stat}>
-              {station.rating_avg?.toFixed(1)} ★ ({station.review_count} reviews)
-            </Text>
+          <View style={{ marginTop: spacing.sm }}>
+            <StationRating
+              stationId={station.id}
+              stationName={station.name}
+              currentRating={station.rating_avg}
+              reviewCount={station.review_count}
+            />
           </View>
         </Card>
 

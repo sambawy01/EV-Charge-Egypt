@@ -219,28 +219,49 @@ export function MapScreen({ navigation }: any) {
             {displayStations.length} stations nearby
           </Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-            {displayStations.slice(0, 5).map((station) => (
-              <TouchableOpacity
-                key={station.id}
-                onPress={() => handleStationPress(station)}
-                style={{
-                  backgroundColor: colors.surfaceSecondary,
-                  borderRadius: 12,
-                  padding: 12,
-                  width: 200,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <Text style={{ ...typography.bodyBold, color: colors.text, fontSize: 13 }} numberOfLines={1}>{station.name}</Text>
-                <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: 2 }} numberOfLines={1}>{station.address || station.city}</Text>
-                {station.distance_km != null && (
-                  <Text style={{ ...typography.mono, color: colors.primary, marginTop: 4, fontSize: 12 }}>
-                    {station.distance_km < 1 ? `${Math.round(station.distance_km * 1000)}m` : `${station.distance_km.toFixed(1)} km`}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            ))}
+            {displayStations.slice(0, 5).map((station) => {
+              const statusColor = getStatusColor(station);
+              const statusLabel = station.status === 'available' ? 'Available'
+                : station.status === 'partial' ? 'Partial'
+                : station.status === 'occupied' ? 'Busy'
+                : station.status === 'offline' ? 'Offline'
+                : 'Available';
+              return (
+                <TouchableOpacity
+                  key={station.id}
+                  onPress={() => handleStationPress(station)}
+                  style={{
+                    backgroundColor: colors.surfaceSecondary,
+                    borderRadius: 12,
+                    padding: 12,
+                    width: 200,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                  }}
+                >
+                  {/* Status dot + label */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusColor }} />
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: statusColor }}>{statusLabel}</Text>
+                  </View>
+                  <Text style={{ ...typography.bodyBold, color: colors.text, fontSize: 13 }} numberOfLines={1}>{station.name}</Text>
+                  <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: 2 }} numberOfLines={1}>{station.address || station.city}</Text>
+                  {station.rating_avg > 0 && (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                      <Text style={{ fontSize: 10, color: '#FFB020' }}>{'\u2605'}</Text>
+                      <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                        {station.rating_avg.toFixed(1)} ({station.review_count})
+                      </Text>
+                    </View>
+                  )}
+                  {station.distance_km != null && (
+                    <Text style={{ ...typography.mono, color: colors.primary, marginTop: 4, fontSize: 12 }}>
+                      {station.distance_km < 1 ? `${Math.round(station.distance_km * 1000)}m` : `${station.distance_km.toFixed(1)} km`}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -367,6 +388,14 @@ export function MapScreen({ navigation }: any) {
                         <Text style={styles.providerText}>{providerName}</Text>
                       ) : null}
                     </View>
+                    {station.rating_avg > 0 && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
+                        <Text style={{ fontSize: 10, color: '#FFB020' }}>{'\u2605'}</Text>
+                        <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                          {station.rating_avg.toFixed(1)} ({station.review_count})
+                        </Text>
+                      </View>
+                    )}
                     {(() => {
                       const rec = recommendations.get(station.id);
                       if (!rec || rec.score < 60) return null;
