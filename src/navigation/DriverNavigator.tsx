@@ -29,6 +29,9 @@ import { VehicleDashboardScreen } from '@/driver/screens/VehicleDashboardScreen'
 // Plan 8: AI Trip Planner
 import { TripPlannerScreen } from '@/driver/screens/TripPlannerScreen';
 
+// Plan 9: News Feed
+import { NewsScreen } from '@/driver/screens/NewsScreen';
+
 // Plan 6: Driver Profile screens
 import { ProfileScreen } from '@/driver/screens/ProfileScreen';
 import { VehicleScreen } from '@/driver/screens/VehicleScreen';
@@ -42,6 +45,7 @@ const BookingsStack = createNativeStackNavigator();
 const WalletStack = createNativeStackNavigator();
 const AIStack = createNativeStackNavigator();
 const VehicleStack = createNativeStackNavigator();
+const NewsStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 
 function MapTabStack() {
@@ -95,6 +99,14 @@ function VehicleTabStack() {
       <VehicleStack.Screen name="AddVehicle" component={AddVehicleScreen} />
       <VehicleStack.Screen name="TripPlanner" component={TripPlannerScreen} />
     </VehicleStack.Navigator>
+  );
+}
+
+function NewsTabStack() {
+  return (
+    <NewsStack.Navigator screenOptions={{ headerShown: false }}>
+      <NewsStack.Screen name="NewsFeed" component={NewsScreen} />
+    </NewsStack.Navigator>
   );
 }
 
@@ -227,6 +239,7 @@ function InlineTabs({ state, descriptors, navigation }: any) {
     { name: 'MapTab', icon: '\u{1F4CD}', label: 'Map' },
     { name: 'BookingsTab', icon: '\u{1F4CB}', label: 'Bookings' },
     { name: 'AITab', icon: '\u{1F916}', label: 'AI' },
+    { name: 'NewsTab', icon: '\u{1F4F0}', label: 'News' },
     { name: 'WalletTab', icon: '\u{1F4B3}', label: 'Wallet' },
     { name: 'VehicleTab', icon: '\u{1F697}', label: 'Vehicle' },
     { name: 'ProfileTab', icon: '\u{1F464}', label: 'Profile' },
@@ -305,6 +318,7 @@ export function DriverNavigator() {
       <Tab.Screen name="MapTab" component={MapTabStack} />
       <Tab.Screen name="BookingsTab" component={BookingsTabStack} />
       <Tab.Screen name="AITab" component={AITabStack} />
+      <Tab.Screen name="NewsTab" component={NewsTabStack} />
       <Tab.Screen name="WalletTab" component={WalletTabStack} />
       <Tab.Screen name="VehicleTab" component={VehicleTabStack} />
       <Tab.Screen name="ProfileTab" component={ProfileTabStack} />
