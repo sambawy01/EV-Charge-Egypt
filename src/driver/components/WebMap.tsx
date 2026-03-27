@@ -9,10 +9,10 @@ interface Props {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  available: '#10B981',
-  partial: '#F59E0B',
-  occupied: '#EF4444',
-  offline: '#9CA3AF',
+  available: '#00FF88',
+  partial: '#FFB020',
+  occupied: '#FF4D6A',
+  offline: '#5A6482',
 };
 
 /**
@@ -78,7 +78,7 @@ function buildMapHtml(
       latitude: s.latitude,
       longitude: s.longitude,
       status: s.status ?? 'offline',
-      color: STATUS_COLOR[s.status ?? 'offline'] ?? '#9CA3AF',
+      color: STATUS_COLOR[s.status ?? 'offline'] ?? '#5A6482',
       distance: s.distance_km != null ? s.distance_km.toFixed(1) + ' km' : '',
       connectors: (s.connectors || [])
         .map((c) => c.type + ' ' + c.power_kw + 'kW')
@@ -100,11 +100,11 @@ function buildMapHtml(
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#map{width:100%;height:100%}
 .popup-name{font-weight:700;font-size:14px;margin-bottom:4px}
-.popup-provider{font-size:12px;color:#6B7280;margin-bottom:2px}
-.popup-address{font-size:11px;color:#9CA3AF;margin-bottom:4px}
-.popup-connectors{font-size:11px;color:#374151;margin-bottom:4px}
-.popup-distance{font-size:11px;color:#3B82F6;font-weight:600;margin-bottom:6px}
-.popup-status{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#fff}
+.popup-provider{font-size:12px;color:#8892B0;margin-bottom:2px}
+.popup-address{font-size:11px;color:#5A6482;margin-bottom:4px}
+.popup-connectors{font-size:11px;color:#F0F4FF;margin-bottom:4px}
+.popup-distance{font-size:11px;color:#00D4FF;font-weight:600;margin-bottom:6px}
+.popup-status{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#FFFFFF}
 </style>
 </head>
 <body>
@@ -118,8 +118,8 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,att
 
 // Plot user location if known
 if(userLoc){
-  L.circleMarker([userLoc.lat,userLoc.lng],{radius:8,fillColor:'#3B82F6',color:'#fff',weight:3,fillOpacity:1}).addTo(map).bindPopup('<b>You are here</b>');
-  L.circle([userLoc.lat,userLoc.lng],{radius:300,fillColor:'#3B82F6',color:'#3B82F6',weight:1,fillOpacity:0.1}).addTo(map);
+  L.circleMarker([userLoc.lat,userLoc.lng],{radius:8,fillColor:'#00D4FF',color:'#FFFFFF',weight:3,fillOpacity:1}).addTo(map).bindPopup('<b>You are here</b>');
+  L.circle([userLoc.lat,userLoc.lng],{radius:300,fillColor:'#00D4FF',color:'#00D4FF',weight:1,fillOpacity:0.1}).addTo(map);
 }
 
 // Plot stations
@@ -127,7 +127,7 @@ var bounds=[];
 stations.forEach(function(s){
   bounds.push([s.latitude,s.longitude]);
   L.circleMarker([s.latitude,s.longitude],{
-    radius:10,fillColor:s.color,color:'#fff',weight:2,fillOpacity:0.9
+    radius:10,fillColor:s.color,color:'#FFFFFF',weight:2,fillOpacity:0.9
   }).addTo(map).bindPopup(
     '<div class="popup-name">'+s.name+'</div>'+
     '<div class="popup-provider">'+s.provider+'</div>'+

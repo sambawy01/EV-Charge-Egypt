@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Header, Card, Button } from '@/core/components';
-import { colors } from '@/core/theme/colors';
+import { useTheme, colors } from '@/core/theme';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
@@ -12,6 +12,7 @@ const UPCOMING_CHARGES = [
 ];
 
 export function ScheduleScreen({ navigation }: any) {
+  const { colors } = useTheme();
   return (
     <View style={styles.container}>
       <Header title="Charging Schedule" />
@@ -35,7 +36,7 @@ export function ScheduleScreen({ navigation }: any) {
           <Card key={i} style={styles.scheduleCard}>
             <View style={styles.scheduleHeader}>
               <Text style={styles.vehicleName}>{item.vehicle}</Text>
-              <View style={[styles.statusBadge, item.status === 'scheduled' ? styles.statusScheduled : styles.statusPending]}>
+              <View style={[styles.statusBadge, item.status === 'scheduled' ? styles.statusScheduled : { backgroundColor: colors.surfaceSecondary }]}>
                 <Text style={styles.statusText}>{item.status}</Text>
               </View>
             </View>
@@ -62,7 +63,7 @@ const styles = StyleSheet.create({
   vehicleName: { ...(typography.bodyBold as object), color: colors.text, flex: 1 },
   statusBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: 12 },
   statusScheduled: { backgroundColor: colors.primaryLight },
-  statusPending: { backgroundColor: '#FEF3C7' },
+  statusPending: {},
   statusText: { ...(typography.small as object), fontWeight: '600' },
   detail: { ...(typography.caption as object), color: colors.textSecondary, marginTop: 2 },
   time: { color: colors.primary, fontWeight: '600', marginTop: spacing.xs },

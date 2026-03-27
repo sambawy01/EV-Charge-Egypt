@@ -1,13 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors } from '@/core/theme/colors';
+import { useTheme, colors } from '@/core/theme';
 import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
 export function FleetAlertCard({ alerts }: { alerts: string[] }) {
+  const { colors } = useTheme();
   if (!alerts.length) return null;
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.surfaceSecondary }]}>
       <Text style={styles.title}>Alerts</Text>
       {alerts.map((alert, i) => (
         <View key={i} style={styles.alertRow}>
@@ -21,7 +22,6 @@ export function FleetAlertCard({ alerts }: { alerts: string[] }) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FEF2F2',
     borderRadius: borderRadius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,

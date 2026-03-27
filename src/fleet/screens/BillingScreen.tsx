@@ -4,11 +4,12 @@ import { Header, Card } from '@/core/components';
 import { SubscriptionCard } from '../components/SubscriptionCard';
 import { useFleetStore } from '@/core/stores/fleetStore';
 import { formatEGP } from '@/core/utils/formatCurrency';
-import { colors } from '@/core/theme/colors';
+import { useTheme, colors } from '@/core/theme';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
 export function BillingScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const fleet = useFleetStore((s) => s.fleet);
   const currentPlan = fleet?.plan || 'business';
   const creditBalance = fleet?.credit_balance || 45000;
@@ -42,7 +43,7 @@ export function BillingScreen({ navigation }: any) {
           />
         ))}
 
-        <Card style={styles.noteCard}>
+        <Card style={[styles.noteCard, { backgroundColor: colors.surfaceSecondary }]}>
           <Text style={styles.noteTitle}>Enterprise ROI</Text>
           <Text style={styles.noteText}>
             A 100-vehicle fleet saves ~65,000 EGP/month through waived service fees + AI optimization
@@ -62,7 +63,7 @@ const styles = StyleSheet.create({
   balanceValue: { ...(typography.h1 as object), color: colors.primaryDark },
   balanceSub: { ...(typography.small as object), color: colors.primaryDark, opacity: 0.7, marginTop: 4 },
   sectionTitle: { ...(typography.bodyBold as object), color: colors.text, marginBottom: spacing.md },
-  noteCard: { backgroundColor: '#FFFBEB', marginTop: spacing.sm },
+  noteCard: { marginTop: spacing.sm },
   noteTitle: { ...(typography.bodyBold as object), color: colors.text, marginBottom: spacing.sm },
   noteText: { ...(typography.body as object), color: colors.textSecondary, fontSize: 14, lineHeight: 20 },
 });

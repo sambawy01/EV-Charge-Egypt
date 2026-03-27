@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Header, Card, LoadingScreen } from '@/core/components';
 import { useFleetCostReport } from '@/core/queries/useFleetReports';
 import { formatEGP } from '@/core/utils/formatCurrency';
-import { colors } from '@/core/theme/colors';
+import { useTheme, colors } from '@/core/theme';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
@@ -15,6 +15,7 @@ const MOCK_BY_VEHICLE = [
 ];
 
 export function CostBreakdownScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const { data: report, isLoading } = useFleetCostReport('March 2026');
   if (isLoading) return <LoadingScreen message="Generating report..." />;
 
@@ -65,7 +66,7 @@ export function CostBreakdownScreen({ navigation }: any) {
           <>
             <Text style={styles.sectionTitle}>Savings Opportunities</Text>
             {report.savings.map((s, i) => (
-              <Card key={i} style={styles.savingCard}>
+              <Card key={i} style={[styles.savingCard, { backgroundColor: colors.surfaceSecondary }]}>
                 <Text style={styles.savingDesc}>{s.description}</Text>
                 <Text style={styles.savingAmount}>Save {formatEGP(s.amountSavable)}/mo</Text>
               </Card>
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
   vehicleName: { ...(typography.bodyBold as object), color: colors.text, fontSize: 14, flex: 1 },
   vehicleAmount: { ...(typography.bodyBold as object), color: colors.text },
   vehicleDetail: { ...(typography.caption as object), color: colors.textSecondary, marginTop: 2 },
-  savingCard: { backgroundColor: '#F0FDF4', marginBottom: spacing.sm },
+  savingCard: { marginBottom: spacing.sm },
   savingDesc: { ...(typography.body as object), color: colors.text, fontSize: 14 },
   savingAmount: { ...(typography.bodyBold as object), color: colors.success, marginTop: 4 },
 });

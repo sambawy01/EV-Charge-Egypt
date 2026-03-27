@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Header, Card } from '@/core/components';
-import { colors } from '@/core/theme/colors';
+import { useTheme, colors } from '@/core/theme';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
@@ -14,6 +14,7 @@ const MOCK_VEHICLES = [
 ];
 
 function ScoreIndicator({ score }: { score: number }) {
+  const { colors } = useTheme();
   const color = score >= 90 ? colors.success : score >= 75 ? colors.warning : colors.error;
   return (
     <View style={[styles.scoreCircle, { borderColor: color }]}>
@@ -23,6 +24,7 @@ function ScoreIndicator({ score }: { score: number }) {
 }
 
 export function BatteryHealthScreen({ navigation }: any) {
+  const { colors } = useTheme();
   const avgScore = Math.round(MOCK_VEHICLES.reduce((sum, v) => sum + v.score, 0) / MOCK_VEHICLES.length);
 
   return (
@@ -50,7 +52,7 @@ export function BatteryHealthScreen({ navigation }: any) {
           </Card>
         ))}
 
-        <Card style={styles.tipsCard}>
+        <Card style={[styles.tipsCard, { backgroundColor: colors.surfaceSecondary }]}>
           <Text style={styles.tipsTitle}>Fleet Tips</Text>
           <Text style={styles.tip}>• Aim for fast charging under 30% of all sessions per vehicle</Text>
           <Text style={styles.tip}>• Avoid regular charging above 90% for optimal longevity</Text>
@@ -79,7 +81,7 @@ const styles = StyleSheet.create({
   vehiclePlate: { ...(typography.small as object), color: colors.textSecondary },
   vehicleTrend: { ...(typography.caption as object), color: colors.textSecondary, marginTop: 2 },
   warning: { ...(typography.small as object), color: colors.warning, fontWeight: '600', marginTop: 2 },
-  tipsCard: { backgroundColor: '#FFFBEB', marginTop: spacing.md },
+  tipsCard: { marginTop: spacing.md },
   tipsTitle: { ...(typography.bodyBold as object), color: colors.text, marginBottom: spacing.sm },
   tip: { ...(typography.caption as object), color: colors.text, marginBottom: spacing.xs },
 });
