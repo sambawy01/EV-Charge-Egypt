@@ -756,50 +756,53 @@ export function VehicleDashboardScreen({ navigation }: any) {
       <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
         <SectionTitle emoji={'\uD83E\uDD16'} title="AI Insights" colors={colors} />
 
-        <View style={{ gap: 12 }}>
-          {insights.map((insight, i) => {
-            const accentColor =
-              insight.type === 'warning'
-                ? colors.warning
-                : insight.type === 'positive'
-                  ? colors.secondary
-                  : colors.primary;
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+          {insights.slice(0, 4).map((insight, i) => {
+            const borderColors = ['#00D4FF', '#00FF88', '#D946EF', '#FFB020'];
+            const glowColors = ['rgba(0,212,255,0.25)', 'rgba(0,255,136,0.25)', 'rgba(217,70,239,0.25)', 'rgba(255,176,32,0.25)'];
+            const outlineColor = borderColors[i % borderColors.length];
+            const glowColor = glowColors[i % glowColors.length];
             return (
               <View
                 key={i}
                 style={{
+                  width: '48.5%',
+                  aspectRatio: 1,
                   backgroundColor: colors.surface,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderRadius: 12,
-                  flexDirection: 'row',
-                  overflow: 'hidden',
+                  borderWidth: 1.5,
+                  borderColor: outlineColor,
+                  borderRadius: 16,
+                  padding: 16,
+                  justifyContent: 'space-between',
+                  shadowColor: outlineColor,
+                  shadowOffset: { width: 0, height: 0 },
+                  shadowOpacity: 0.4,
+                  shadowRadius: 12,
+                  elevation: 6,
                 }}
               >
-                {/* Left accent line */}
-                <View
-                  style={{
-                    width: 4,
-                    backgroundColor: accentColor,
-                  }}
-                />
-                <View style={{ flex: 1, padding: 14, flexDirection: 'row', gap: 12 }}>
-                  <Text style={{ fontSize: 22 }}>{insight.icon}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ ...typography.bodyBold, color: colors.text, marginBottom: 4 }}>
-                      {insight.title}
-                    </Text>
-                    <Text
-                      style={{
-                        ...typography.caption,
-                        color: colors.textSecondary,
-                        lineHeight: 20,
-                      }}
-                    >
-                      {insight.description}
-                    </Text>
-                  </View>
+                <View>
+                  <Text style={{ fontSize: 28, marginBottom: 10 }}>{insight.icon}</Text>
+                  <Text style={{
+                    ...typography.bodyBold,
+                    color: outlineColor,
+                    marginBottom: 6,
+                    fontSize: 14,
+                  }}>
+                    {insight.title}
+                  </Text>
                 </View>
+                <Text
+                  style={{
+                    ...typography.caption,
+                    color: colors.textSecondary,
+                    lineHeight: 18,
+                    fontSize: 11,
+                  }}
+                  numberOfLines={4}
+                >
+                  {insight.description}
+                </Text>
               </View>
             );
           })}
