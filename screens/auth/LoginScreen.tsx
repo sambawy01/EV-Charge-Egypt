@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Button, Header } from '@/core/components';
 import { useAuth } from '@/core/auth/useAuth';
-import { colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme';
 import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
@@ -18,6 +18,7 @@ export function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { signIn, isLoading } = useAuth();
+  const { colors } = useTheme();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -33,14 +34,21 @@ export function LoginScreen({ navigation }: any) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <Header title="Sign In" onBack={() => navigation.goBack()} />
       <View style={styles.form}>
-        <Text style={styles.label}>Email</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Email</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surfaceSecondary,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -48,9 +56,16 @@ export function LoginScreen({ navigation }: any) {
           placeholder="your@email.com"
           placeholderTextColor={colors.textTertiary}
         />
-        <Text style={styles.label}>Password</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Password</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surfaceSecondary,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -72,7 +87,6 @@ export function LoginScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   form: {
     flex: 1,
@@ -80,17 +94,13 @@ const styles = StyleSheet.create({
   },
   label: {
     ...typography.bodyBold,
-    color: colors.text,
     marginBottom: spacing.xs,
     marginTop: spacing.md,
   },
   input: {
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     ...typography.body,
-    color: colors.text,
   },
 });

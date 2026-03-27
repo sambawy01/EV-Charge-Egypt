@@ -1,16 +1,18 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Button } from '@/core/components';
-import { colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
 export function WelcomeScreen({ navigation }: any) {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.hero}>
-        <Text style={styles.title}>EV Charge Egypt</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { color: colors.primary }]}>EV Charge Egypt</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Find, book & charge across all Egyptian EV providers. One app for everything.
         </Text>
       </View>
@@ -33,7 +35,6 @@ export function WelcomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
     justifyContent: 'space-between',
     padding: spacing.xl,
   },
@@ -44,13 +45,11 @@ const styles = StyleSheet.create({
   },
   title: {
     ...typography.h1,
-    color: colors.primaryDark,
     fontSize: 32,
     textAlign: 'center',
   },
   subtitle: {
     ...typography.body,
-    color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.md,
     maxWidth: 300,

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Button, Header } from '@/core/components';
 import { useAuth } from '@/core/auth/useAuth';
-import { colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme';
 import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 import type { UserRole } from '@/core/types/auth';
@@ -23,6 +23,7 @@ export function RegisterScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('driver');
   const { signUp, isLoading } = useAuth();
+  const { colors } = useTheme();
 
   const handleRegister = async () => {
     if (!fullName || !email || !password) {
@@ -38,37 +39,62 @@ export function RegisterScreen({ navigation }: any) {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <Header title="Create Account" onBack={() => navigation.goBack()} />
       <ScrollView style={styles.form} contentContainerStyle={{ paddingBottom: 40 }}>
-        <Text style={styles.sectionTitle}>I am a...</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>I am a...</Text>
         <View style={styles.roleRow}>
           {(['driver', 'fleet_manager'] as UserRole[]).map((r) => (
             <TouchableOpacity
               key={r}
               onPress={() => setRole(r)}
-              style={[styles.roleCard, role === r && styles.roleCardActive]}
+              style={[
+                styles.roleCard,
+                {
+                  borderColor: role === r ? colors.primary : colors.border,
+                  backgroundColor: role === r ? colors.primaryLight : colors.surface,
+                },
+              ]}
             >
-              <Text style={styles.roleIcon}>{r === 'driver' ? '🚗' : '🏢'}</Text>
-              <Text style={[styles.roleLabel, role === r && styles.roleLabelActive]}>
+              <Text style={styles.roleIcon}>{r === 'driver' ? '\u{1F697}' : '\u{1F3E2}'}</Text>
+              <Text
+                style={[
+                  styles.roleLabel,
+                  { color: role === r ? colors.primary : colors.textSecondary },
+                ]}
+              >
                 {r === 'driver' ? 'Driver' : 'Fleet Manager'}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
-        <Text style={styles.label}>Full Name</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Full Name</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surfaceSecondary,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
           value={fullName}
           onChangeText={setFullName}
           placeholder="Ahmed Hassan"
           placeholderTextColor={colors.textTertiary}
         />
-        <Text style={styles.label}>Email</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Email</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surfaceSecondary,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -76,9 +102,16 @@ export function RegisterScreen({ navigation }: any) {
           placeholder="your@email.com"
           placeholderTextColor={colors.textTertiary}
         />
-        <Text style={styles.label}>Password</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Password</Text>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surfaceSecondary,
+              borderColor: colors.border,
+              color: colors.text,
+            },
+          ]}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -100,7 +133,6 @@ export function RegisterScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   form: {
     flex: 1,
@@ -108,7 +140,6 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     ...typography.h3,
-    color: colors.text,
     marginBottom: spacing.md,
   },
   roleRow: {
@@ -122,12 +153,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: borderRadius.lg,
     borderWidth: 2,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  roleCardActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
   },
   roleIcon: {
     fontSize: 32,
@@ -135,24 +160,16 @@ const styles = StyleSheet.create({
   },
   roleLabel: {
     ...typography.bodyBold,
-    color: colors.textSecondary,
-  },
-  roleLabelActive: {
-    color: colors.primaryDark,
   },
   label: {
     ...typography.bodyBold,
-    color: colors.text,
     marginBottom: spacing.xs,
     marginTop: spacing.md,
   },
   input: {
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     ...typography.body,
-    color: colors.text,
   },
 });
