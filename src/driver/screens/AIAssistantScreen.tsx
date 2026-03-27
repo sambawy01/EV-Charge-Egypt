@@ -15,8 +15,8 @@ import { useTheme } from '@/core/theme';
 import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 import { stationService } from '@/core/services/stationService';
-import { vehicleAnalysisService } from '@/core/services/vehicleAnalysisService';
 import { useVehicles } from '@/core/queries/useVehicles';
+import { claudeService, ClaudeMessage } from '@/core/services/claudeService';
 import { useAuthStore } from '@/core/stores/authStore';
 
 // ---------------------------------------------------------------------------
@@ -242,6 +242,7 @@ export function AIAssistantScreen({ navigation }: any) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState<ClaudeMessage[]>([]);
 
   const scrollRef = useRef<ScrollView>(null);
   const glowAnim = useRef(new Animated.Value(0.5)).current;
@@ -316,102 +317,102 @@ export function AIAssistantScreen({ navigation }: any) {
   // -----------------------------------------------------------------------
   const processCommand = useCallback(
     async (userInput: string): Promise<AIResponse> => {
-      const lower = userInput.toLowerCase();
+      // Build context from user data
+      const vehicle = vehicles?.[0];
+      const context: Parameters<typeof claudeService.chat>[1] = {
+        vehicleMake: vehicle?.make,
+        vehicleModel: vehicle?.model,
+        batteryKwh: vehicle?.battery_capacity_kwh,
+        rangeKm: (vehicle as any)?.spec?.rangeKm,
+        stationCount: 100,
+        userName: undefined,
+      };
 
-      // Find nearest charger
-      if (
-        lower.includes('nearest') ||
-        lower.includes('find') ||
-        lower.includes('close') ||
-        lower.includes('charge near')
-      ) {
+      // Get nearest station for context
+      try {
+        const stations = await stationService.getStations();
+        if (stations.length > 0) {
+          context.nearestStation = stations[0].name;
+          context.nearestStationDistance = (stations[0] as any).distance_km
+            ? `${(stations[0] as any).distance_km.toFixed(1)} km`
+            : 'nearby';
+        }
+      } catch {}
+
+      // Call Claude
+      const aiText = await claudeService.chat(userInput, context, conversationHistory);
+
+      // Update conversation history
+      setConversationHistory(prev => [
+        ...prev.slice(-10), // keep last 10 messages for context
+        { role: 'user', content: userInput },
+        { role: 'assistant', content: aiText },
+      ]);
+
+      // Check if response should include visual cards
+      const lower = userInput.toLowerCase();
+      const cards: AIResponse['cards'] = [];
+
+      // If asking about stations, add station cards
+      if (lower.includes('nearest') || lower.includes('find') || lower.includes('station') || lower.includes('charger')) {
         try {
           const stations = await stationService.getStations();
           const nearest = stations.slice(0, 3);
-          return {
-            text: `I found ${nearest.length} stations near you. Here are the closest:`,
-            cards: nearest.map((s: any) => ({
-              type: 'station' as const,
+          nearest.forEach((s: any) => {
+            cards.push({
+              type: 'station',
               data: {
                 name: s.name,
-                address: s.address || s.city || 'Egypt',
+                address: s.address || s.city,
                 distance: s.distance_km ? `${s.distance_km.toFixed(1)} km` : '--',
-                power: '50 kW',
+                power: s.connectors?.[0]?.power_kw ? `${s.connectors[0].power_kw} kW` : '50 kW',
               },
-            })),
-          };
-        } catch {
-          return { text: 'I had trouble fetching stations. Please check your connection and try again.' };
-        }
+            });
+          });
+        } catch {}
       }
 
-      // Plan a trip
-      if (lower.includes('plan') || lower.includes('trip') || lower.includes('route') || lower.includes('drive to')) {
-        return {
-          text: "I'll help you plan your trip! Let me open the Trip Planner for you.",
-          cards: [{ type: 'trip', data: { action: 'openTripPlanner' } }],
-        };
+      // If asking about costs, add cost card
+      if (lower.includes('cost') || lower.includes('cheap') || lower.includes('price')) {
+        cards.push({
+          type: 'cost',
+          data: {
+            options: [
+              { station: 'Off-peak (10PM-6AM)', type: 'Any provider', price: '2.50' },
+              { station: 'Sha7en Stations', type: 'Type 2 / CCS2', price: '3.00' },
+              { station: 'Elsewedy Plug', type: 'Type 2 / CCS2', price: '3.20' },
+              { station: 'IKARUS Stations', type: 'CCS2 / GB/T', price: '3.50' },
+            ],
+          },
+        });
       }
 
-      // Battery health
+      // If asking about battery, add battery card
       if (lower.includes('battery') || lower.includes('health') || lower.includes('degradation')) {
-        const vehicle = vehicles?.[0];
         if (vehicle) {
           try {
+            const { vehicleAnalysisService } = await import('@/core/services/vehicleAnalysisService');
             const analysis = await vehicleAnalysisService.analyzeVehicle(vehicle);
-            return {
-              text: `Here's your ${vehicle.make} ${vehicle.model} battery report:`,
-              cards: [
-                {
-                  type: 'battery',
-                  data: {
-                    score: analysis.battery.healthScore,
-                    degradation: analysis.battery.estimatedDegradation,
-                    tip: analysis.battery.temperatureNote,
-                  },
-                },
-              ],
-            };
-          } catch {
-            return { text: 'I had trouble analyzing your battery. Please try again.' };
-          }
-        }
-        return { text: 'Add a vehicle first to check battery health. Go to the Vehicle tab to add one.' };
-      }
-
-      // Cost / cheapest
-      if (lower.includes('cost') || lower.includes('cheap') || lower.includes('price') || lower.includes('save')) {
-        return {
-          text: "Here's a cost comparison of nearby charging options:",
-          cards: [
-            {
-              type: 'cost',
+            cards.push({
+              type: 'battery',
               data: {
-                options: [
-                  { station: 'Sha7en - Police Academy', type: 'CCS2 50kW', price: '2.80' },
-                  { station: 'Elsewedy Plug - City Stars', type: 'Type 2 22kW', price: '3.20' },
-                  { station: 'IKARUS New Cairo', type: 'CCS2 120kW', price: '3.50' },
-                  { station: 'Infinity EV - Mall of Egypt', type: 'Type 2 22kW', price: '3.80' },
-                ],
+                score: analysis.battery.healthScore,
+                degradation: analysis.battery.estimatedDegradation,
+                tip: analysis.battery.temperatureNote,
               },
-            },
-          ],
-        };
+            });
+          } catch {}
+        }
       }
 
-      // Book — not available in Egypt
-      if (lower.includes('book') || lower.includes('reserve') || lower.includes('slot')) {
-        return {
-          text: "Charging slot booking isn't available in Egypt yet — stations are first-come, first-served. I can help you find available stations nearby or plan a trip with charging stops!",
-        };
+      // Trip planning
+      if (lower.includes('trip') || lower.includes('plan') || lower.includes('route')) {
+        cards.push({ type: 'trip', data: { action: 'openTripPlanner' } });
       }
 
-      // Default
-      return {
-        text: `I understand you're asking about "${userInput}". I can help you with:\n\n\u2022 Finding nearby charging stations\n\u2022 Planning road trips\n\u2022 Checking battery health\n\u2022 Comparing charging costs\n\u2022 Station ratings & reviews\n\nTry asking me something specific!`,
-      };
+      return { text: aiText, cards: cards.length > 0 ? cards : undefined };
     },
-    [vehicles],
+    [vehicles, conversationHistory],
   );
 
   // -----------------------------------------------------------------------
@@ -751,6 +752,7 @@ export function AIAssistantScreen({ navigation }: any) {
         <TouchableOpacity
           onPress={() => {
             setMessages([]);
+            setConversationHistory([]);
           }}
         >
           <Text style={{ ...(typography.caption as object), color: colors.primary }}>New Chat</Text>
