@@ -237,7 +237,6 @@ function InlineTabs({ state, descriptors, navigation }: any) {
 
   const tabs = [
     { name: 'MapTab', icon: '\u{1F4CD}', label: 'Map' },
-    { name: 'BookingsTab', icon: '\u{1F4CB}', label: 'Bookings' },
     { name: 'AITab', icon: '\u{1F916}', label: 'AI' },
     { name: 'NewsTab', icon: '\u{1F4F0}', label: 'EV News' },
     { name: 'WalletTab', icon: '\u{1F4B3}', label: 'Wallet' },
@@ -316,7 +315,6 @@ export function DriverNavigator() {
       screenOptions={{ headerShown: false }}
     >
       <Tab.Screen name="MapTab" component={MapTabStack} />
-      <Tab.Screen name="BookingsTab" component={BookingsTabStack} />
       <Tab.Screen name="AITab" component={AITabStack} />
       <Tab.Screen name="NewsTab" component={NewsTabStack} />
       <Tab.Screen name="WalletTab" component={WalletTabStack} />
