@@ -10,12 +10,44 @@ export const authService = {
       options: { data: { full_name: fullName, role } },
     });
     if (authError) throw authError;
-    if (!authData.user) throw new Error('Sign up failed — please try again');
 
-    const userId = authData.user.id;
+    // Supabase returns a fake user with empty identities when email already exists
+    // (to prevent email enumeration). Detect this and try sign-in instead.
+    const isRealUser = authData.user?.identities && authData.user.identities.length > 0;
 
-    // Build a local profile from the signup inputs so we always have something
-    // to return — even if DB insert or auto sign-in fails (e.g. email confirm ON).
+    if (!isRealUser) {
+      // Email already registered — try signing in with the password they provided
+      try {
+        const signInResult = await supabase.auth.signInWithPassword({ email, password });
+        if (signInResult.error) {
+          throw new Error('This email is already registered. Please sign in instead, or use a different email.');
+        }
+        // Sign in succeeded — fetch their existing profile
+        const { data: existingProfile } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', signInResult.data.user.id)
+          .single();
+        if (existingProfile) return existingProfile;
+        // No profile yet — create one
+        return {
+          id: signInResult.data.user.id,
+          role,
+          full_name: fullName,
+          phone: null,
+          avatar_url: null,
+          preferred_lang: 'en',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } as UserProfile;
+      } catch (e: any) {
+        throw new Error(e.message || 'This email is already registered. Please sign in instead.');
+      }
+    }
+
+    const userId = authData.user!.id;
+
+    // Build a local profile so we always have something to return
     const localProfile: UserProfile = {
       id: userId,
       role,
@@ -27,24 +59,18 @@ export const authService = {
       updated_at: new Date().toISOString(),
     } as UserProfile;
 
-    // Best-effort: persist profile in DB (may fail due to RLS without session)
+    // Best-effort: persist profile in DB
     try {
       await supabase
         .from('user_profiles')
         .upsert({ id: userId, role, full_name: fullName }, { onConflict: 'id' });
-    } catch {
-      // Swallow — profile will be created on first real session
-    }
+    } catch {}
 
-    // Best-effort: auto sign-in (works only when email confirmation is OFF)
+    // Best-effort: auto sign-in (works when email confirmation is OFF)
     try {
       await supabase.auth.signInWithPassword({ email, password });
-    } catch {
-      // Expected to fail when email confirmation is required
-    }
+    } catch {}
 
-    // Always return the profile — useAuth.signUp calls setUser() with this,
-    // which sets isAuthenticated = true regardless of session state.
     return localProfile;
   },
 
