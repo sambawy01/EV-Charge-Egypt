@@ -106,11 +106,13 @@ function buildMapHtml(
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#map{width:100%;height:100%;background:#0A0E1A}
 /* Dark-themed info window overrides */
-.gm-style-iw{background:#141B2D !important;border-radius:12px !important;padding:0 !important}
-.gm-style-iw-d{overflow:auto !important}
-.gm-style-iw-tc::after{background:#141B2D !important}
-.gm-ui-hover-effect{filter:invert(1)}
-.gm-style-iw-chr{position:absolute;top:4px;right:4px}
+.gm-style .gm-style-iw-c{background:#141B2D !important;border-radius:12px !important;padding:0 !important;box-shadow:0 4px 20px rgba(0,212,255,0.15) !important;border:1px solid #2A3350 !important}
+.gm-style .gm-style-iw-d{overflow:auto !important;background:#141B2D !important}
+.gm-style .gm-style-iw-tc{display:none !important}
+.gm-style .gm-style-iw-t::after{background:#141B2D !important;box-shadow:none !important}
+.gm-style .gm-ui-hover-effect{filter:invert(1) !important;opacity:0.7 !important}
+.gm-style .gm-style-iw-chr{position:absolute !important;top:4px !important;right:4px !important}
+.gm-style .gm-style-iw{background:#141B2D !important}
 </style>
 </head>
 <body>
@@ -126,13 +128,16 @@ var DARK_STYLE=[
   {featureType:'road',elementType:'geometry',stylers:[{color:'#1C2438'}]},
   {featureType:'road',elementType:'geometry.stroke',stylers:[{color:'#2A3350'}]},
   {featureType:'road.highway',elementType:'geometry',stylers:[{color:'#232B42'}]},
+  {featureType:'road.highway',elementType:'labels.text.fill',stylers:[{color:'#8892B0'}]},
   {featureType:'water',elementType:'geometry',stylers:[{color:'#0e1626'}]},
   {featureType:'water',elementType:'labels.text.fill',stylers:[{color:'#5A6482'}]},
-  {featureType:'poi',elementType:'geometry',stylers:[{color:'#141B2D'}]},
-  {featureType:'poi',elementType:'labels.text.fill',stylers:[{color:'#5A6482'}]},
-  {featureType:'poi.park',elementType:'geometry',stylers:[{color:'#111927'}]},
-  {featureType:'transit',elementType:'geometry',stylers:[{color:'#1C2438'}]},
-  {featureType:'administrative',elementType:'geometry.stroke',stylers:[{color:'#2A3350'}]}
+  {featureType:'poi',stylers:[{visibility:'off'}]},
+  {featureType:'poi.park',elementType:'geometry',stylers:[{color:'#111927'},{visibility:'on'}]},
+  {featureType:'poi.park',elementType:'labels',stylers:[{visibility:'off'}]},
+  {featureType:'transit',stylers:[{visibility:'off'}]},
+  {featureType:'administrative',elementType:'geometry.stroke',stylers:[{color:'#2A3350'}]},
+  {featureType:'administrative.locality',elementType:'labels.text.fill',stylers:[{color:'#8892B0'}]},
+  {featureType:'administrative.country',elementType:'labels.text.fill',stylers:[{color:'#5A6482'}]}
 ];
 
 function createMarkerIcon(color,isHighlighted){
@@ -170,6 +175,7 @@ function initMap(){
     streetViewControl:true,
     fullscreenControl:false,
     gestureHandling:'greedy',
+    clickableIcons:false,
     backgroundColor:'#0A0E1A'
   });
 
