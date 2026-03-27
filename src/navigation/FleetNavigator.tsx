@@ -125,22 +125,22 @@ function GlowTab({ icon, label, isFocused, onPress, colors }: {
         gap: 8,
         backgroundColor: isFocused ? colors.surfaceTertiary : colors.surfaceSecondary,
         borderWidth: 1.5,
-        borderColor: colors.primary,
+        borderColor: isFocused ? colors.primary : colors.secondary,
         borderBottomWidth: isFocused ? 3 : 2,
-        borderBottomColor: isFocused ? colors.primaryDark : colors.primaryDark,
-        shadowColor: colors.primary,
+        borderBottomColor: isFocused ? colors.primaryDark : colors.secondaryDark,
+        shadowColor: isFocused ? colors.primary : colors.secondary,
         shadowOffset: isFocused
           ? { width: glowX as any, height: glowY as any }
           : { width: 0, height: 0 },
-        shadowOpacity: isFocused ? (glowOpacity as any) : 0.25,
-        shadowRadius: isFocused ? (glowRadius as any) : 8,
-        elevation: isFocused ? 10 : 4,
+        shadowOpacity: isFocused ? (glowOpacity as any) : 0.35,
+        shadowRadius: isFocused ? (glowRadius as any) : 10,
+        elevation: isFocused ? 10 : 5,
       }}>
         <Text style={{ fontSize: 18 }}>{icon}</Text>
         <Text style={{
           fontFamily: isFocused ? 'SpaceGrotesk-SemiBold' : undefined,
           fontSize: 14,
-          color: isFocused ? colors.primary : colors.text,
+          color: isFocused ? colors.primary : colors.secondary,
           fontWeight: isFocused ? '600' : '400',
         }}>
           {label}
