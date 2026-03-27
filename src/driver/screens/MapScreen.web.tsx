@@ -256,14 +256,33 @@ export function MapScreen({ navigation }: any) {
                     </View>
                   </View>
 
-                  {/* Distance */}
-                  {station.distance_km != null && (
-                    <Text style={styles.distanceText}>
-                      {station.distance_km < 1
-                        ? `${Math.round(station.distance_km * 1000)} m`
-                        : `${station.distance_km.toFixed(1)} km`}
-                    </Text>
-                  )}
+                  {/* Distance + Navigate */}
+                  <View style={{ alignItems: 'flex-end', gap: 6, marginLeft: 8 }}>
+                    {station.distance_km != null && (
+                      <Text style={styles.distanceText}>
+                        {station.distance_km < 1
+                          ? `${Math.round(station.distance_km * 1000)} m`
+                          : `${station.distance_km.toFixed(1)} km`}
+                      </Text>
+                    )}
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        const url = `https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}&travelmode=driving`;
+                        if (typeof window !== 'undefined') window.open(url, '_blank');
+                      }}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 6,
+                        backgroundColor: colors.primaryLight,
+                        borderWidth: 1,
+                        borderColor: colors.primary,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primary }}>📍 Navigate</Text>
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
               );
             })
