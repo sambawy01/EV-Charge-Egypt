@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import { colors } from '@/core/theme/colors';
 import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 import type { Station } from '@/core/types/station';
+import { aiContextService } from '@/core/services/aiContextService';
+import { useVehicles } from '@/core/queries/useVehicles';
 
 // ---------------------------------------------------------------------------
 // Hooks
@@ -115,6 +117,7 @@ export function MapScreen({ navigation }: any) {
   const { location: userLocation, resolved: gpsResolved } = useWebLocation();
 
   const { data: stations, isLoading } = useStations(filters, userLocation);
+  const { data: vehicles } = useVehicles();
 
   const handleStationPress = useCallback(
     (station: Station) => {
@@ -138,6 +141,22 @@ export function MapScreen({ navigation }: any) {
     // Chip filter
     return matchesChipFilter(s, activeChip);
   });
+
+  // Build AI context and recommendations
+  const aiContext = useMemo(() => {
+    if (!vehicles?.length) return null;
+    return aiContextService.buildContext(vehicles[0], location);
+  }, [vehicles, location]);
+
+  const displayStations = filteredStations;
+
+  const recommendations = useMemo(() => {
+    if (!aiContext || !displayStations.length) return new Map();
+    const recs = aiContextService.recommendStations(displayStations, aiContext);
+    const map = new Map<string, any>();
+    recs.forEach(r => map.set(r.stationId, r));
+    return map;
+  }, [aiContext, displayStations]);
 
   if (!gpsResolved || isLoading) return <LoadingScreen message="Finding your location..." />;
 
@@ -254,6 +273,28 @@ export function MapScreen({ navigation }: any) {
                         <Text style={styles.providerText}>{providerName}</Text>
                       ) : null}
                     </View>
+                    {(() => {
+                      const rec = recommendations.get(station.id);
+                      if (!rec || rec.score < 60) return null;
+                      return (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                          <View style={{
+                            backgroundColor: rec.score >= 80 ? 'rgba(0, 255, 136, 0.15)' : 'rgba(0, 212, 255, 0.15)',
+                            paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4,
+                          }}>
+                            <Text style={{
+                              fontSize: 10, fontWeight: '700',
+                              color: rec.score >= 80 ? '#00FF88' : '#00D4FF',
+                            }}>
+                              AI {rec.score}%
+                            </Text>
+                          </View>
+                          {rec.reasons[0] && (
+                            <Text style={{ fontSize: 9, color: '#8892B0' }} numberOfLines={1}>{rec.reasons[0]}</Text>
+                          )}
+                        </View>
+                      );
+                    })()}
                   </View>
 
                   {/* Distance + Navigate */}

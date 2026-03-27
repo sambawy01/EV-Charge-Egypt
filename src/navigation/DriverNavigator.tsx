@@ -1,9 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, Easing, Platform, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from '@/core/theme';
+import { aiContextService } from '@/core/services/aiContextService';
+import { useVehicles } from '@/core/queries/useVehicles';
 
 // Existing screens
 import { MapScreen } from '@/driver/screens/MapScreen';
@@ -213,6 +215,13 @@ function GlowTab({ icon, label, isFocused, onPress, colors }: {
 
 function InlineTabs({ state, descriptors, navigation }: any) {
   const { colors } = useTheme();
+  const { data: vehicles } = useVehicles();
+
+  const aiNotifCount = useMemo(() => {
+    if (!vehicles?.length) return 0;
+    const ctx = aiContextService.buildContext(vehicles[0], null);
+    return aiContextService.getNotificationCount(ctx);
+  }, [vehicles]);
 
   const tabs = [
     { name: 'MapTab', icon: '\u{1F4CD}', label: 'Map' },
@@ -253,16 +262,34 @@ function InlineTabs({ state, descriptors, navigation }: any) {
         const routeIndex = state.routes.findIndex((r: any) => r.name === tab.name);
         const isFocused = state.index === routeIndex;
         return (
-          <GlowTab
-            key={tab.name}
-            icon={tab.icon}
-            label={tab.label}
-            isFocused={isFocused}
-            colors={colors}
-            onPress={() => {
-              if (!isFocused) navigation.navigate(tab.name);
-            }}
-          />
+          <View key={tab.name} style={{ position: 'relative' }}>
+            <GlowTab
+              icon={tab.icon}
+              label={tab.label}
+              isFocused={isFocused}
+              colors={colors}
+              onPress={() => {
+                if (!isFocused) navigation.navigate(tab.name);
+              }}
+            />
+            {tab.name === 'AITab' && aiNotifCount > 0 && !isFocused && (
+              <View style={{
+                position: 'absolute',
+                top: -4,
+                right: -4,
+                width: 18,
+                height: 18,
+                borderRadius: 9,
+                backgroundColor: '#D946EF',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 2,
+                borderColor: colors.surface,
+              }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFFFFF' }}>{aiNotifCount}</Text>
+              </View>
+            )}
+          </View>
         );
       })}
     </View>

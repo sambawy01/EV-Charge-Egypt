@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { LoadingScreen } from '@/core/components';
@@ -9,11 +9,20 @@ import { useTransactions } from '@/core/queries/useTransactions';
 import { useTheme } from '@/core/theme';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
+import { aiContextService } from '@/core/services/aiContextService';
+import { useVehicles } from '@/core/queries/useVehicles';
 
 export function WalletScreen({ navigation }: any) {
   const { colors } = useTheme();
   const { data: wallet, isLoading: walletLoading } = useWallet();
   const { data: transactions } = useTransactions(10);
+  const { data: vehicles } = useVehicles();
+
+  const walletInsight = useMemo(() => {
+    if (!vehicles?.length) return null;
+    const ctx = aiContextService.buildContext(vehicles[0], null);
+    return aiContextService.getWalletInsights(ctx);
+  }, [vehicles]);
 
   if (walletLoading) return <LoadingScreen message="Loading wallet..." />;
 
@@ -36,6 +45,39 @@ export function WalletScreen({ navigation }: any) {
               currency={wallet?.currency || 'EGP'}
               onTopUp={() => navigation.navigate('TopUp')}
             />
+            {walletInsight && (
+              <View style={{
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 12,
+                padding: 14,
+                marginTop: 16,
+                gap: 8,
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontSize: 14 }}>{'\uD83E\uDD16'}</Text>
+                  <Text style={{ fontFamily: 'SpaceGrotesk-SemiBold', fontSize: 13, color: colors.primary }}>AI Insight</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontSize: 20 }}>
+                    {walletInsight.monthlyTrend === 'up' ? '\uD83D\uDCC8' : walletInsight.monthlyTrend === 'down' ? '\uD83D\uDCC9' : '\u27A1\uFE0F'}
+                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ ...typography.caption, color: colors.text }}>
+                      Spending {walletInsight.monthlyTrend} {walletInsight.trendPercent}%
+                    </Text>
+                    <Text style={{ ...typography.small, color: colors.textSecondary }}>{walletInsight.trendReason}</Text>
+                  </View>
+                </View>
+                <Text style={{ ...typography.caption, color: colors.secondary }}>
+                  {'\uD83D\uDCA1'} {walletInsight.costOptimizationTip}
+                </Text>
+                <Text style={{ ...typography.small, color: colors.textTertiary }}>
+                  Potential savings: ~{walletInsight.potentialMonthlySavings} EGP/month
+                </Text>
+              </View>
+            )}
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleRow}>
                 <Text
