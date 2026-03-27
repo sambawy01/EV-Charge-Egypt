@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, Easing, Platform, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Easing, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -227,6 +227,8 @@ function GlowTab({ icon, label, isFocused, onPress, colors }: {
 
 function InlineTabs({ state, descriptors, navigation }: any) {
   const { colors } = useTheme();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
   const { data: vehicles } = useVehicles();
 
   const aiNotifCount = useMemo(() => {
@@ -238,12 +240,71 @@ function InlineTabs({ state, descriptors, navigation }: any) {
   const tabs = [
     { name: 'MapTab', icon: '\u{1F4CD}', label: 'Map' },
     { name: 'AITab', icon: '\u{1F916}', label: 'AI' },
-    { name: 'NewsTab', icon: '\u{1F4F0}', label: 'EV News' },
+    { name: 'NewsTab', icon: '\u{1F4F0}', label: 'News' },
     { name: 'WalletTab', icon: '\u{1F4B3}', label: 'Wallet' },
     { name: 'VehicleTab', icon: '\u{1F697}', label: 'Vehicle' },
     { name: 'ProfileTab', icon: '\u{1F464}', label: 'Profile' },
   ];
 
+  // --- Mobile: simple bottom tab bar ---
+  if (isMobile) {
+    return (
+      <View style={{
+        flexDirection: 'row',
+        backgroundColor: colors.surface,
+        borderTopWidth: 1,
+        borderTopColor: colors.border,
+        paddingBottom: 20,
+        paddingTop: 8,
+      }}>
+        {tabs.map((tab) => {
+          const routeIndex = state.routes.findIndex((r: any) => r.name === tab.name);
+          const isFocused = state.index === routeIndex;
+          return (
+            <TouchableOpacity
+              key={tab.name}
+              onPress={() => { if (!isFocused) navigation.navigate(tab.name); }}
+              style={{
+                flex: 1,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 4,
+                position: 'relative',
+              }}
+            >
+              <Text style={{ fontSize: 20, marginBottom: 2 }}>{tab.icon}</Text>
+              <Text style={{
+                fontSize: 10,
+                color: isFocused ? colors.primary : colors.textTertiary,
+                fontWeight: isFocused ? '700' : '400',
+              }}>
+                {tab.label}
+              </Text>
+              {tab.name === 'AITab' && aiNotifCount > 0 && !isFocused && (
+                <View style={{
+                  position: 'absolute',
+                  top: -2,
+                  right: '20%',
+                  width: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  backgroundColor: '#D946EF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderWidth: 2,
+                  borderColor: colors.surface,
+                }}>
+                  <Text style={{ fontSize: 8, fontWeight: '700', color: '#FFFFFF' }}>{aiNotifCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    );
+  }
+
+  // --- Desktop: top bar with brand + GlowTab buttons ---
   return (
     <View style={{
       flexDirection: 'row',
@@ -309,10 +370,16 @@ function InlineTabs({ state, descriptors, navigation }: any) {
 }
 
 export function DriverNavigator() {
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
   return (
     <Tab.Navigator
       tabBar={(props) => <InlineTabs {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{
+        headerShown: false,
+        tabBarPosition: isMobile ? 'bottom' : 'top',
+      }}
     >
       <Tab.Screen name="MapTab" component={MapTabStack} />
       <Tab.Screen name="AITab" component={AITabStack} />

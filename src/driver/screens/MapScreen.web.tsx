@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
 import { useStations } from '@/core/queries/useStations';
 import { useMapStore } from '@/core/stores/mapStore';
@@ -158,10 +159,103 @@ export function MapScreen({ navigation }: any) {
     return map;
   }, [aiContext, displayStations]);
 
+  const { width: screenWidth } = useWindowDimensions();
+  const isMobile = screenWidth < 768;
+
   if (!gpsResolved || isLoading) return <LoadingScreen message="Finding your location..." />;
 
   const panelTitle = buildPanelTitle(filteredStations, searchQuery, userLocation);
 
+  // --- Mobile: full-screen map with overlays ---
+  if (isMobile) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        {/* Full screen map */}
+        <View style={{ flex: 1 }}>
+          <WebMap stations={displayStations} onStationPress={handleStationPress} userLocation={userLocation} />
+        </View>
+
+        {/* Search bar overlay at top */}
+        <View style={{
+          position: 'absolute', top: 12, left: 12, right: 12,
+          backgroundColor: colors.surface,
+          borderRadius: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 12,
+          height: 44,
+          borderWidth: 1,
+          borderColor: colors.border,
+          shadowColor: '#000',
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+          elevation: 5,
+        }}>
+          <Text style={{ color: colors.textTertiary, marginRight: 8 }}>{'\uD83D\uDD0D'}</Text>
+          <TextInput
+            placeholder="Search stations..."
+            placeholderTextColor={colors.textTertiary}
+            style={{ flex: 1, color: colors.text, fontSize: 14 }}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+
+        {/* Bottom station count + nearest station cards */}
+        <View style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          backgroundColor: colors.surface,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: 24,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
+          maxHeight: 200,
+        }}>
+          <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 12 }} />
+          <Text style={{ ...typography.caption, color: colors.textTertiary, marginBottom: 8 }}>
+            {displayStations.length} stations nearby
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+            {displayStations.slice(0, 5).map((station) => (
+              <TouchableOpacity
+                key={station.id}
+                onPress={() => handleStationPress(station)}
+                style={{
+                  backgroundColor: colors.surfaceSecondary,
+                  borderRadius: 12,
+                  padding: 12,
+                  width: 200,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+              >
+                <Text style={{ ...typography.bodyBold, color: colors.text, fontSize: 13 }} numberOfLines={1}>{station.name}</Text>
+                <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: 2 }} numberOfLines={1}>{station.address || station.city}</Text>
+                {station.distance_km != null && (
+                  <Text style={{ ...typography.mono, color: colors.primary, marginTop: 4, fontSize: 12 }}>
+                    {station.distance_km < 1 ? `${Math.round(station.distance_km * 1000)}m` : `${station.distance_km.toFixed(1)} km`}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Filter modal */}
+        <FilterModal
+          visible={showFilter}
+          onClose={() => setShowFilter(false)}
+          onApply={setFilters}
+          initialFilter={filters}
+        />
+      </View>
+    );
+  }
+
+  // --- Desktop: side-by-side panel + map ---
   return (
     <View style={styles.root}>
       {/* ---- Left Station Panel ---- */}
