@@ -140,7 +140,7 @@ function GlowTab({ icon, label, isFocused, onPress, colors }: {
         <Text style={{
           fontFamily: isFocused ? 'SpaceGrotesk-SemiBold' : undefined,
           fontSize: 14,
-          color: isFocused ? colors.primary : colors.secondary,
+          color: isFocused ? colors.primary : colors.white,
           fontWeight: isFocused ? '600' : '400',
         }}>
           {label}
