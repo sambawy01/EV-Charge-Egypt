@@ -79,10 +79,11 @@ function GlowTab({ icon, label, isFocused, onPress, colors }: {
   icon: string; label: string; isFocused: boolean; onPress: () => void; colors: any;
 }) {
   const spinAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (isFocused) {
-      const loop = Animated.loop(
+      const spinLoop = Animated.loop(
         Animated.timing(spinAnim, {
           toValue: 1,
           duration: 3000,
@@ -90,10 +91,28 @@ function GlowTab({ icon, label, isFocused, onPress, colors }: {
           useNativeDriver: false,
         })
       );
-      loop.start();
-      return () => loop.stop();
+      const pulseLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.07,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: false,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 800,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: false,
+          }),
+        ])
+      );
+      spinLoop.start();
+      pulseLoop.start();
+      return () => { spinLoop.stop(); pulseLoop.stop(); };
     } else {
       spinAnim.setValue(0);
+      pulseAnim.setValue(1);
     }
   }, [isFocused]);
 
@@ -135,6 +154,7 @@ function GlowTab({ icon, label, isFocused, onPress, colors }: {
         shadowOpacity: isFocused ? (glowOpacity as any) : 0.35,
         shadowRadius: isFocused ? (glowRadius as any) : 10,
         elevation: isFocused ? 10 : 5,
+        transform: [{ scale: isFocused ? pulseAnim : 1 }],
       }}>
         <Text style={{ fontSize: 18 }}>{icon}</Text>
         <Text style={{
