@@ -166,45 +166,47 @@ function GlowTab({ icon, label, isFocused, onPress, colors }: {
     outputRange: [10, 16, 10, 16, 10],
   });
 
-  const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
-
+  // Gradient border trick: outer LinearGradient as border, inner dark View as content
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
-      <AnimatedGradient
-        colors={isFocused ? ['#00D4FF', '#8B5CF6', '#D946EF'] : ['#0e2a3d', '#1a1535', '#2a1230']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 18,
-          paddingVertical: 12,
-          borderRadius: 12,
-          gap: 8,
-          borderWidth: 1.5,
-          borderColor: isFocused ? '#D946EF' : '#00D4FF',
-          borderBottomWidth: isFocused ? 3 : 2,
-          borderBottomColor: isFocused ? '#8B5CF6' : '#0095CC',
-          shadowColor: isFocused ? '#D946EF' : '#00D4FF',
-          shadowOffset: isFocused
-            ? { width: glowX as any, height: glowY as any }
-            : { width: 0, height: 0 },
-          shadowOpacity: isFocused ? (glowOpacity as any) : 0.3,
-          shadowRadius: isFocused ? (glowRadius as any) : 8,
-          elevation: isFocused ? 10 : 5,
-          transform: [{ scale: isFocused ? pulseAnim : 1 }],
-        }}
-      >
-        <Text style={{ fontSize: 18 }}>{icon}</Text>
-        <Text style={{
-          fontFamily: isFocused ? 'SpaceGrotesk-SemiBold' : undefined,
-          fontSize: 14,
-          color: '#FFFFFF',
-          fontWeight: isFocused ? '700' : '400',
-        }}>
-          {label}
-        </Text>
-      </AnimatedGradient>
+      <Animated.View style={{
+        transform: [{ scale: isFocused ? pulseAnim : 1 }],
+        shadowColor: isFocused ? '#D946EF' : '#00D4FF',
+        shadowOffset: isFocused
+          ? { width: glowX as any, height: glowY as any }
+          : { width: 0, height: 0 },
+        shadowOpacity: isFocused ? (glowOpacity as any) : 0.2,
+        shadowRadius: isFocused ? (glowRadius as any) : 6,
+        elevation: isFocused ? 10 : 4,
+        borderRadius: 12,
+      }}>
+        <LinearGradient
+          colors={isFocused ? ['#00D4FF', '#8B5CF6', '#D946EF'] : ['#00D4FF44', '#8B5CF644', '#D946EF44']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ borderRadius: 12, padding: 1.5 }}
+        >
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 18,
+            paddingVertical: 12,
+            borderRadius: 10.5,
+            gap: 8,
+            backgroundColor: colors.surfaceSecondary,
+          }}>
+            <Text style={{ fontSize: 18 }}>{icon}</Text>
+            <Text style={{
+              fontFamily: isFocused ? 'SpaceGrotesk-SemiBold' : undefined,
+              fontSize: 14,
+              color: '#FFFFFF',
+              fontWeight: isFocused ? '700' : '400',
+            }}>
+              {label}
+            </Text>
+          </View>
+        </LinearGradient>
+      </Animated.View>
     </TouchableOpacity>
   );
 }
