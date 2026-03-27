@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme';
 import { spacing } from '../theme/spacing';
 import { typography } from '../theme/typography';
 
@@ -11,16 +11,28 @@ interface HeaderProps {
 }
 
 export function Header({ title, onBack, rightAction }: HeaderProps) {
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.surface,
+          borderBottomColor: colors.border,
+        },
+      ]}
+    >
       {onBack ? (
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>{'<'}</Text>
+          <Text style={[styles.backText, { color: colors.primary }]}>{'<'}</Text>
         </TouchableOpacity>
       ) : (
         <View style={styles.placeholder} />
       )}
-      <Text style={styles.title} numberOfLines={1}>{title}</Text>
+      <Text style={[styles.title, { color: colors.text }]} numberOfLines={1}>
+        {title}
+      </Text>
       {rightAction || <View style={styles.placeholder} />}
     </View>
   );
@@ -33,13 +45,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   title: {
     ...typography.h3,
-    color: colors.text,
     flex: 1,
     textAlign: 'center',
   },
@@ -51,7 +60,6 @@ const styles = StyleSheet.create({
   },
   backText: {
     fontSize: 24,
-    color: colors.primary,
   },
   placeholder: {
     width: 40,

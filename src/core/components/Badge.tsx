@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme';
 import { borderRadius, spacing } from '../theme/spacing';
 
 interface BadgeProps {
@@ -9,14 +9,15 @@ interface BadgeProps {
   backgroundColor?: string;
 }
 
-export function Badge({
-  label,
-  color = colors.white,
-  backgroundColor = colors.primary,
-}: BadgeProps) {
+export function Badge({ label, color, backgroundColor }: BadgeProps) {
+  const { colors } = useTheme();
+
+  const textColor = color ?? colors.primary;
+  const bgColor = backgroundColor ?? colors.primaryLight;
+
   return (
-    <View style={[styles.container, { backgroundColor }]}>
-      <Text style={[styles.text, { color }]}>{label}</Text>
+    <View style={[styles.container, { backgroundColor: bgColor }]}>
+      <Text style={[styles.text, { color: textColor }]}>{label}</Text>
     </View>
   );
 }
@@ -24,7 +25,7 @@ export function Badge({
 const styles = StyleSheet.create({
   container: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
+    paddingVertical: 4,
     borderRadius: borderRadius.full,
     alignSelf: 'flex-start',
   },
