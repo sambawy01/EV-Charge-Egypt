@@ -239,7 +239,7 @@ function InlineTabs({ state, descriptors, navigation }: any) {
     { name: 'MapTab', icon: '\u{1F4CD}', label: 'Map' },
     { name: 'BookingsTab', icon: '\u{1F4CB}', label: 'Bookings' },
     { name: 'AITab', icon: '\u{1F916}', label: 'AI' },
-    { name: 'NewsTab', icon: '\u{1F4F0}', label: 'News' },
+    { name: 'NewsTab', icon: '\u{1F4F0}', label: 'EV News' },
     { name: 'WalletTab', icon: '\u{1F4B3}', label: 'Wallet' },
     { name: 'VehicleTab', icon: '\u{1F697}', label: 'Vehicle' },
     { name: 'ProfileTab', icon: '\u{1F464}', label: 'Profile' },
