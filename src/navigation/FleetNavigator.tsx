@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, Animated, Easing } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { FleetHomeScreen } from '@/fleet/screens/FleetHomeScreen';
@@ -75,6 +75,81 @@ function SettingsStack() {
   );
 }
 
+function GlowTab({ icon, label, isFocused, onPress, colors }: {
+  icon: string; label: string; isFocused: boolean; onPress: () => void; colors: any;
+}) {
+  const spinAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (isFocused) {
+      const loop = Animated.loop(
+        Animated.timing(spinAnim, {
+          toValue: 1,
+          duration: 3000,
+          easing: Easing.linear,
+          useNativeDriver: false,
+        })
+      );
+      loop.start();
+      return () => loop.stop();
+    } else {
+      spinAnim.setValue(0);
+    }
+  }, [isFocused]);
+
+  const glowX = spinAnim.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [0, 6, 0, -6, 0],
+  });
+  const glowY = spinAnim.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [-6, 0, 6, 0, -6],
+  });
+  const glowOpacity = spinAnim.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [0.4, 0.7, 0.4, 0.7, 0.4],
+  });
+  const glowRadius = spinAnim.interpolate({
+    inputRange: [0, 0.25, 0.5, 0.75, 1],
+    outputRange: [10, 16, 10, 16, 10],
+  });
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+      <Animated.View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 18,
+        paddingVertical: 12,
+        borderRadius: 12,
+        gap: 8,
+        backgroundColor: isFocused ? colors.surfaceTertiary : colors.surfaceSecondary,
+        borderWidth: 1.5,
+        borderColor: colors.primary,
+        borderBottomWidth: isFocused ? 3 : 2,
+        borderBottomColor: isFocused ? colors.primaryDark : colors.primaryDark,
+        shadowColor: colors.primary,
+        shadowOffset: isFocused
+          ? { width: glowX as any, height: glowY as any }
+          : { width: 0, height: 0 },
+        shadowOpacity: isFocused ? (glowOpacity as any) : 0.25,
+        shadowRadius: isFocused ? (glowRadius as any) : 8,
+        elevation: isFocused ? 10 : 4,
+      }}>
+        <Text style={{ fontSize: 18 }}>{icon}</Text>
+        <Text style={{
+          fontFamily: isFocused ? 'SpaceGrotesk-SemiBold' : undefined,
+          fontSize: 14,
+          color: isFocused ? colors.primary : colors.text,
+          fontWeight: isFocused ? '600' : '400',
+        }}>
+          {label}
+        </Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
 function InlineTabs({ state, descriptors, navigation }: any) {
   const { colors } = useTheme();
 
@@ -111,47 +186,21 @@ function InlineTabs({ state, descriptors, navigation }: any) {
       {/* Spacer */}
       <View style={{ flex: 1 }} />
 
-      {/* Nav tabs — 3D boxes with cyan glow */}
+      {/* Nav tabs — all cyan borders, active has spinning glow */}
       {tabs.map((tab) => {
         const routeIndex = state.routes.findIndex((r: any) => r.name === tab.name);
         const isFocused = state.index === routeIndex;
         return (
-          <TouchableOpacity
+          <GlowTab
             key={tab.name}
+            icon={tab.icon}
+            label={tab.label}
+            isFocused={isFocused}
+            colors={colors}
             onPress={() => {
               if (!isFocused) navigation.navigate(tab.name);
             }}
-            activeOpacity={0.8}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingHorizontal: 18,
-              paddingVertical: 12,
-              borderRadius: 12,
-              gap: 8,
-              backgroundColor: isFocused ? colors.surfaceTertiary : colors.surfaceSecondary,
-              borderWidth: isFocused ? 1.5 : 1,
-              borderColor: isFocused ? colors.primary : colors.border,
-              borderTopColor: isFocused ? colors.primary : colors.surfaceTertiary,
-              borderBottomColor: isFocused ? colors.primaryDark : colors.background,
-              borderBottomWidth: isFocused ? 3 : 2,
-              shadowColor: isFocused ? colors.primary : 'transparent',
-              shadowOffset: { width: 0, height: isFocused ? 0 : 2 },
-              shadowOpacity: isFocused ? 0.5 : 0,
-              shadowRadius: isFocused ? 12 : 0,
-              elevation: isFocused ? 8 : 2,
-            }}
-          >
-            <Text style={{ fontSize: 18 }}>{tab.icon}</Text>
-            <Text style={{
-              fontFamily: isFocused ? 'SpaceGrotesk-SemiBold' : undefined,
-              fontSize: 14,
-              color: isFocused ? colors.primary : colors.textSecondary,
-              fontWeight: isFocused ? '600' : '400',
-            }}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
+          />
         );
       })}
     </View>
