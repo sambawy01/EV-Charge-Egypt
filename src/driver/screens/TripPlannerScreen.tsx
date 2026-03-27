@@ -17,8 +17,6 @@ import { useVehicles } from '@/core/queries/useVehicles';
 import { evDatabase, EVModel } from '@/core/data/evDatabase';
 import { googleMapsService } from '@/core/services/googleMapsService';
 import { stationService } from '@/core/services/stationService';
-import { bookingService } from '@/core/services/bookingService';
-import { useAuthStore } from '@/core/stores/authStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -100,8 +98,6 @@ export function TripPlannerScreen({ navigation }: any) {
   const [planningSteps, setPlanningSteps] = useState<number[]>([]);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Auth for booking
-  const { user } = useAuthStore();
 
   // ---------------------------------------------------------------------------
   // Fallback route data (used when Google Maps API is unavailable / CORS)
@@ -1468,47 +1464,13 @@ export function TripPlannerScreen({ navigation }: any) {
 
         {/* Action Buttons */}
         <View style={{ paddingHorizontal: 20, marginTop: 32, gap: 12 }}>
-          {/* Book All */}
+          {/* Save Trip */}
           <TouchableOpacity
-            onPress={async () => {
-              if (!tripPlan || !user) {
-                Alert.alert(
-                  'Slots Booked!',
-                  "You're all set for your trip. All charging slots have been reserved.",
-                );
-                return;
-              }
-
-              try {
-                for (const stop of tripPlan.stops) {
-                  const scheduledStart = new Date();
-                  scheduledStart.setHours(
-                    scheduledStart.getHours() + Math.round(stop.distanceFromStart / avgSpeed),
-                  );
-                  const scheduledEnd = new Date(
-                    scheduledStart.getTime() + stop.chargeDuration * 60000,
-                  );
-
-                  await bookingService.createBooking({
-                    userId: user.id,
-                    stationId: (stop as any).stationId || (stop as any).id || 'unknown',
-                    connectorId: (stop as any).connectorId || 'default',
-                    vehicleId: selectedVehicle?.id,
-                    scheduledStart: scheduledStart.toISOString(),
-                    scheduledEnd: scheduledEnd.toISOString(),
-                  });
-                }
-                Alert.alert(
-                  'All Booked! \u26A1',
-                  `${tripPlan.stops.length} charging slots reserved for your ${tripPlan.from} \u2192 ${tripPlan.to} trip.`,
-                );
-              } catch (err: any) {
-                // Fallback if booking fails (no auth, no table, etc.)
-                Alert.alert(
-                  'Trip Planned! \u26A1',
-                  `Your ${tripPlan.from} \u2192 ${tripPlan.to} trip is ready. ${tripPlan.stops.length} stops planned.`,
-                );
-              }
+            onPress={() => {
+              Alert.alert(
+                'Trip Saved! \u26A1',
+                `Your ${tripPlan?.from || ''} \u2192 ${tripPlan?.to || ''} trip with ${tripPlan?.stops.length || 0} charging stops has been saved.`,
+              );
             }}
             activeOpacity={0.85}
           >
@@ -1529,7 +1491,7 @@ export function TripPlannerScreen({ navigation }: any) {
               }}
             >
               <Text style={{ ...typography.button, fontSize: 17, color: colors.black }}>
-                Book All Charging Slots
+                Save Trip Plan
               </Text>
             </LinearGradient>
           </TouchableOpacity>

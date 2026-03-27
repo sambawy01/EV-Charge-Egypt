@@ -399,26 +399,16 @@ export function AIAssistantScreen({ navigation }: any) {
         };
       }
 
-      // Book
+      // Book — not available in Egypt
       if (lower.includes('book') || lower.includes('reserve') || lower.includes('slot')) {
         return {
-          text: "I've found an available slot for you:",
-          cards: [
-            {
-              type: 'booking',
-              data: {
-                station: 'Elsewedy Plug - City Stars',
-                time: 'Today, 6:00 PM',
-                charger: 'CCS2 50kW \u00B7 Bay 2',
-              },
-            },
-          ],
+          text: "Charging slot booking isn't available in Egypt yet — stations are first-come, first-served. I can help you find available stations nearby or plan a trip with charging stops!",
         };
       }
 
       // Default
       return {
-        text: `I understand you're asking about "${userInput}". I can help you with:\n\n\u2022 Finding nearby charging stations\n\u2022 Planning road trips\n\u2022 Checking battery health\n\u2022 Comparing charging costs\n\u2022 Booking charging slots\n\nTry asking me something specific!`,
+        text: `I understand you're asking about "${userInput}". I can help you with:\n\n\u2022 Finding nearby charging stations\n\u2022 Planning road trips\n\u2022 Checking battery health\n\u2022 Comparing charging costs\n\u2022 Station ratings & reviews\n\nTry asking me something specific!`,
       };
     },
     [vehicles],
