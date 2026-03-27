@@ -169,6 +169,7 @@ function createInfoContent(s){
 }
 
 function initMap(){
+  var EGYPT_BOUNDS={north:31.8,south:22.0,west:24.5,east:37.0};
   var map=new google.maps.Map(document.getElementById('map'),{
     center:{lat:${lat},lng:${lng}},
     zoom:${zoom},
@@ -180,7 +181,9 @@ function initMap(){
     fullscreenControl:false,
     gestureHandling:'greedy',
     clickableIcons:false,
-    backgroundColor:'#0A0E1A'
+    backgroundColor:'#0A0E1A',
+    restriction:{latLngBounds:EGYPT_BOUNDS,strictBounds:false},
+    minZoom:6
   });
 
   var openInfoWindow=null;
