@@ -27,8 +27,8 @@ function isCacheFresh(): boolean {
 
 export const stationService = {
   /**
-   * Primary path: fetch real stations from OpenChargeMap.
-   * Fallback: load from Supabase (cached/seeded data).
+   * Primary path: fetch curated stations from Supabase (100+ verified).
+   * Supplements with OpenChargeMap data merged in (deduped by name).
    */
   async getStations(options: StationQueryOptions = {}): Promise<Station[]> {
     const { filter, latitude, longitude, radiusKm } = options;
@@ -36,16 +36,38 @@ export const stationService = {
     let stations: Station[];
 
     try {
-      // Use in-memory cache when fresh
-      if (isCacheFresh() && _ocmCache) {
-        stations = _ocmCache.stations;
-      } else {
-        stations = await fetchEgyptStations({ latitude, longitude, radiusKm });
-        _ocmCache = { stations, fetchedAt: Date.now() };
+      // Supabase is the primary source — our curated, geocoded stations
+      stations = await this._getStationsFromSupabase();
+
+      // Optionally merge OCM stations that aren't already in Supabase
+      try {
+        let ocmStations: Station[];
+        if (isCacheFresh() && _ocmCache) {
+          ocmStations = _ocmCache.stations;
+        } else {
+          ocmStations = await fetchEgyptStations({ latitude, longitude, radiusKm });
+          _ocmCache = { stations: ocmStations, fetchedAt: Date.now() };
+        }
+        // Dedupe: only add OCM stations not already in Supabase (by name similarity)
+        const supabaseNames = new Set(stations.map((s) => s.name.toLowerCase()));
+        const newOcm = ocmStations.filter(
+          (s) => !supabaseNames.has(s.name.toLowerCase())
+        );
+        if (newOcm.length > 0) {
+          stations = [...stations, ...newOcm];
+        }
+      } catch (ocmErr) {
+        console.warn('[stationService] OCM merge skipped:', ocmErr);
       }
     } catch (err) {
-      console.warn('[stationService] OCM fetch failed, falling back to Supabase:', err);
-      stations = await this._getStationsFromSupabase();
+      console.warn('[stationService] Supabase fetch failed, trying OCM:', err);
+      try {
+        stations = await fetchEgyptStations({ latitude, longitude, radiusKm });
+        _ocmCache = { stations, fetchedAt: Date.now() };
+      } catch (ocmErr) {
+        console.error('[stationService] Both sources failed:', ocmErr);
+        stations = [];
+      }
     }
 
     // Apply client-side filters
