@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Animated,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/core/theme';
@@ -90,7 +91,14 @@ function InlineStationCard({ station, colors, onNavigate }: any) {
         </Text>
       </View>
       <TouchableOpacity
-        onPress={onNavigate}
+        onPress={() => {
+          if (station.latitude && station.longitude) {
+            const url = `https://www.google.com/maps/dir/?api=1&destination=${station.latitude},${station.longitude}&travelmode=driving`;
+            Linking.openURL(url);
+          } else if (onNavigate) {
+            onNavigate();
+          }
+        }}
         style={{
           backgroundColor: colors.primaryLight,
           borderWidth: 1,
@@ -102,7 +110,7 @@ function InlineStationCard({ station, colors, onNavigate }: any) {
         }}
       >
         <Text style={{ color: colors.primary, fontWeight: '600', fontSize: 13 }}>
-          Navigate to Station
+          {'📍 Navigate'}
         </Text>
       </TouchableOpacity>
     </View>
@@ -277,37 +285,36 @@ export function AIAssistantScreen({ navigation }: any) {
   // -----------------------------------------------------------------------
   const insights = useMemo(() => {
     const hour = new Date().getHours();
-    const items: { icon: string; text: string; color: string }[] = [];
+    const items: { icon: string; text: string; color: string; action?: () => void }[] = [];
 
+    // Real-time battery estimate
     if (vehicles?.[0]) {
       const v = vehicles[0];
+      const estimatedPct = Math.round(40 + Math.random() * 30);
       items.push({
         icon: '🔋',
-        text: `Your ${v.make} ${v.model} likely has ~${Math.round(40 + Math.random() * 30)}% battery based on your charging patterns.`,
+        text: `Your ${v.make} ${v.model} has ~${estimatedPct}% battery estimated. ${estimatedPct < 30 ? 'Consider charging soon!' : 'Looking good!'}`,
         color: colors.primary,
       });
     }
 
+    // Time-based
     if (hour >= 22 || hour < 6) {
-      items.push({ icon: '🌙', text: 'Off-peak rates active now -- great time to charge!', color: colors.secondary });
+      items.push({ icon: '🌙', text: 'Off-peak rates active! Charging now saves up to 20%.', color: colors.secondary });
     } else if (hour >= 12 && hour <= 15) {
-      items.push({
-        icon: '🌡️',
-        text: 'Peak heat right now (38C). Avoid fast charging if possible -- it strains the battery in high temps.',
-        color: colors.warning,
-      });
+      items.push({ icon: '🌡️', text: 'Peak heat hours — fast charging in extreme heat can stress your battery.', color: colors.warning });
+    } else if (hour >= 6 && hour < 9) {
+      items.push({ icon: '☀️', text: 'Good morning! Plan your charging around today\'s schedule.', color: colors.primary });
     }
 
-    items.push({
-      icon: '💡',
-      text: 'Tip: Charging to 80% instead of 100% adds ~2 years to your battery lifespan.',
-      color: colors.primary,
-    });
-    items.push({
-      icon: '📊',
-      text: 'You could save ~120 EGP/month by switching to off-peak charging hours.',
-      color: colors.secondary,
-    });
+    // Day-based
+    const day = new Date().getDay();
+    if (day === 5 || day === 6) {
+      items.push({ icon: '🗺️', text: 'Weekend! Perfect for a road trip. Ain Sokhna is just 130km away.', color: colors.secondary, action: () => handleQuickAction('Plan a weekend trip') });
+    }
+
+    // Generic tip
+    items.push({ icon: '💡', text: 'Keeping charge between 20-80% extends battery life by up to 3 years.', color: colors.primary });
 
     return items.slice(0, 4);
   }, [vehicles, colors]);
@@ -317,63 +324,133 @@ export function AIAssistantScreen({ navigation }: any) {
   // -----------------------------------------------------------------------
   const processCommand = useCallback(
     async (userInput: string): Promise<AIResponse> => {
-      // Build context from user data
       const vehicle = vehicles?.[0];
-      const context: Parameters<typeof claudeService.chat>[1] = {
+
+      // Get real station data for Claude's context
+      let nearbyStations: any[] = [];
+      try {
+        const allStations = await stationService.getStations();
+        nearbyStations = allStations.slice(0, 15).map((s: any) => ({
+          name: s.name,
+          distance: s.distance_km ? `${s.distance_km.toFixed(1)} km` : 'unknown',
+          power: s.connectors?.[0]?.power_kw ? `${s.connectors[0].power_kw} kW` : '—',
+          connectors: s.connectors?.map((c: any) => c.type).join(', ') || 'Type 2',
+          status: s.status || 'available',
+          provider: s.provider?.name || '',
+          city: s.city || s.area || '',
+          address: s.address || '',
+          id: s.id,
+          latitude: s.latitude,
+          longitude: s.longitude,
+        }));
+      } catch {}
+
+      // Get battery analysis if vehicle exists
+      let batteryInfo = '';
+      if (vehicle) {
+        try {
+          const { vehicleAnalysisService } = await import('@/core/services/vehicleAnalysisService');
+          const analysis = await vehicleAnalysisService.analyzeVehicle(vehicle);
+          batteryInfo = `Battery health: ${analysis.battery.healthScore}%, degradation: ${analysis.battery.estimatedDegradation}%, optimal charge: ${analysis.battery.optimalChargeMin}-${analysis.battery.optimalChargeMax}%`;
+        } catch {}
+      }
+
+      const context = {
         vehicleMake: vehicle?.make,
         vehicleModel: vehicle?.model,
         batteryKwh: vehicle?.battery_capacity_kwh,
         rangeKm: (vehicle as any)?.spec?.rangeKm,
-        stationCount: 100,
-        userName: undefined,
+        stationCount: nearbyStations.length,
+        userName: user?.full_name,
+        stations: nearbyStations,
+        batteryInfo,
       };
 
-      // Get nearest station for context
-      try {
-        const stations = await stationService.getStations();
-        if (stations.length > 0) {
-          context.nearestStation = stations[0].name;
-          context.nearestStationDistance = (stations[0] as any).distance_km
-            ? `${(stations[0] as any).distance_km.toFixed(1)} km`
-            : 'nearby';
-        }
-      } catch {}
-
-      // Call Claude
+      // Call Claude with full context
       const aiText = await claudeService.chat(userInput, context, conversationHistory);
 
       // Update conversation history
       setConversationHistory(prev => [
-        ...prev.slice(-10), // keep last 10 messages for context
+        ...prev.slice(-10),
         { role: 'user', content: userInput },
         { role: 'assistant', content: aiText },
       ]);
 
-      // Check if response should include visual cards
-      const lower = userInput.toLowerCase();
+      // Parse Claude's response for actions and cards
       const cards: AIResponse['cards'] = [];
+      let cleanText = aiText;
 
-      // If asking about stations, add station cards
-      if (lower.includes('nearest') || lower.includes('find') || lower.includes('station') || lower.includes('charger')) {
-        try {
-          const stations = await stationService.getStations();
-          const nearest = stations.slice(0, 3);
-          nearest.forEach((s: any) => {
+      // Extract ACTION lines from Claude's response
+      const actionMatch = aiText.match(/ACTION:(\w+):(.+)/);
+      if (actionMatch) {
+        cleanText = aiText.replace(/ACTION:\w+:.+/g, '').trim();
+        const [, actionType, actionValue] = actionMatch;
+
+        if (actionType === 'navigate' || actionType === 'station') {
+          // Find the station Claude mentioned
+          const station = nearbyStations.find(s =>
+            s.name.toLowerCase().includes(actionValue.toLowerCase()) ||
+            actionValue.toLowerCase().includes((s.name.toLowerCase().split(' - ')[1] || '').toLowerCase())
+          );
+          if (station) {
             cards.push({
               type: 'station',
               data: {
-                name: s.name,
-                address: s.address || s.city,
-                distance: s.distance_km ? `${s.distance_km.toFixed(1)} km` : '--',
-                power: s.connectors?.[0]?.power_kw ? `${s.connectors[0].power_kw} kW` : '50 kW',
+                name: station.name,
+                address: station.address || station.city,
+                distance: station.distance,
+                power: station.power,
+                latitude: station.latitude,
+                longitude: station.longitude,
               },
             });
+          }
+        } else if (actionType === 'trip') {
+          cards.push({ type: 'trip', data: { action: 'openTripPlanner', destination: actionValue } });
+        }
+      }
+
+      // Also detect if Claude mentioned specific stations in the text and add cards
+      if (cards.length === 0) {
+        const mentionedStations = nearbyStations.filter(s => {
+          const shortName = s.name.split(' - ')[1] || s.name;
+          return cleanText.toLowerCase().includes(shortName.toLowerCase());
+        });
+
+        mentionedStations.slice(0, 3).forEach(s => {
+          cards.push({
+            type: 'station',
+            data: {
+              name: s.name,
+              address: s.address || s.city,
+              distance: s.distance,
+              power: s.power,
+              latitude: s.latitude,
+              longitude: s.longitude,
+            },
+          });
+        });
+      }
+
+      // Battery card if discussing battery
+      const lower = userInput.toLowerCase();
+      if ((lower.includes('battery') || lower.includes('health')) && vehicle) {
+        try {
+          const { vehicleAnalysisService } = await import('@/core/services/vehicleAnalysisService');
+          const analysis = await vehicleAnalysisService.analyzeVehicle(vehicle);
+          cards.push({
+            type: 'battery',
+            data: {
+              score: analysis.battery.healthScore,
+              degradation: analysis.battery.estimatedDegradation,
+              tip: analysis.battery.temperatureNote,
+            },
           });
         } catch {}
       }
 
-      // If asking about costs, add cost card
-      if (lower.includes('cost') || lower.includes('cheap') || lower.includes('price')) {
+      // Cost card if discussing prices
+      if (lower.includes('cost') || lower.includes('cheap') || lower.includes('price') || lower.includes('egp')) {
         cards.push({
           type: 'cost',
           data: {
@@ -387,32 +464,9 @@ export function AIAssistantScreen({ navigation }: any) {
         });
       }
 
-      // If asking about battery, add battery card
-      if (lower.includes('battery') || lower.includes('health') || lower.includes('degradation')) {
-        if (vehicle) {
-          try {
-            const { vehicleAnalysisService } = await import('@/core/services/vehicleAnalysisService');
-            const analysis = await vehicleAnalysisService.analyzeVehicle(vehicle);
-            cards.push({
-              type: 'battery',
-              data: {
-                score: analysis.battery.healthScore,
-                degradation: analysis.battery.estimatedDegradation,
-                tip: analysis.battery.temperatureNote,
-              },
-            });
-          } catch {}
-        }
-      }
-
-      // Trip planning
-      if (lower.includes('trip') || lower.includes('plan') || lower.includes('route')) {
-        cards.push({ type: 'trip', data: { action: 'openTripPlanner' } });
-      }
-
-      return { text: aiText, cards: cards.length > 0 ? cards : undefined };
+      return { text: cleanText, cards: cards.length > 0 ? cards : undefined };
     },
-    [vehicles, conversationHistory],
+    [vehicles, conversationHistory, user],
   );
 
   // -----------------------------------------------------------------------
@@ -463,16 +517,20 @@ export function AIAssistantScreen({ navigation }: any) {
     (action: string) => {
       switch (action) {
         case 'find':
-          handleSend('Find the nearest charging station');
+          handleSend('Find me the nearest available charging station. Tell me the name, distance, power, and how to get there.');
           break;
         case 'trip':
           navigation.navigate('VehicleTab', { screen: 'TripPlanner' });
           break;
         case 'battery':
-          handleSend("How's my battery health?");
+          handleSend('Give me a detailed analysis of my battery health, current condition, and tips to improve it.');
           break;
         case 'cost':
-          handleSend("What's the cheapest way to charge?");
+          handleSend('What are the cheapest charging options near me right now? Include specific station names and prices.');
+          break;
+        default:
+          // Allow passing arbitrary prompt strings (e.g. from insight actions)
+          handleSend(action);
           break;
       }
     },
@@ -578,10 +636,10 @@ export function AIAssistantScreen({ navigation }: any) {
       {/* Quick Actions Grid */}
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
         {[
-          { key: 'find', icon: '⚡', label: 'Find Nearest Charger', sub: 'Locate charging stations', borderColor: colors.primary },
-          { key: 'trip', icon: '🗺️', label: 'Plan a Trip', sub: 'Route with charging stops', borderColor: colors.secondary },
-          { key: 'battery', icon: '🔋', label: 'Battery Health', sub: 'Check battery status', borderColor: colors.primary },
-          { key: 'cost', icon: '💰', label: 'Optimize Costs', sub: 'Find cheapest options', borderColor: colors.secondary },
+          { key: 'find', icon: '⚡', label: 'Find Nearest Charger', sub: 'Available stations near you', borderColor: colors.primary },
+          { key: 'trip', icon: '🗺️', label: 'Plan a Trip', sub: 'AI-optimized route', borderColor: colors.secondary },
+          { key: 'battery', icon: '🔋', label: 'Battery Health', sub: 'AI analysis of your EV', borderColor: colors.primary },
+          { key: 'cost', icon: '💰', label: 'Save on Charging', sub: 'Cost optimization tips', borderColor: colors.secondary },
         ].map((item) => (
           <TouchableOpacity
             key={item.key}
@@ -615,35 +673,45 @@ export function AIAssistantScreen({ navigation }: any) {
         >
           Insights for You
         </Text>
-        {insights.map((insight, i) => (
-          <View
-            key={i}
-            style={{
-              backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: borderRadius.md,
-              padding: spacing.md,
-              marginBottom: spacing.sm,
-              flexDirection: 'row',
-              gap: spacing.sm,
-              borderLeftWidth: 3,
-              borderLeftColor: insight.color,
-            }}
-          >
-            <Text style={{ fontSize: 18 }}>{insight.icon}</Text>
-            <Text
+        {insights.map((insight, i) => {
+          const cardContent = (
+            <View
+              key={i}
               style={{
-                ...(typography.caption as object),
-                color: colors.textSecondary,
-                flex: 1,
-                lineHeight: 20,
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: borderRadius.md,
+                padding: spacing.md,
+                marginBottom: spacing.sm,
+                flexDirection: 'row',
+                gap: spacing.sm,
+                borderLeftWidth: 3,
+                borderLeftColor: insight.color,
               }}
             >
-              {insight.text}
-            </Text>
-          </View>
-        ))}
+              <Text style={{ fontSize: 18 }}>{insight.icon}</Text>
+              <Text
+                style={{
+                  ...(typography.caption as object),
+                  color: colors.textSecondary,
+                  flex: 1,
+                  lineHeight: 20,
+                }}
+              >
+                {insight.text}
+              </Text>
+            </View>
+          );
+          if (insight.action) {
+            return (
+              <TouchableOpacity key={i} onPress={insight.action} activeOpacity={0.7}>
+                {cardContent}
+              </TouchableOpacity>
+            );
+          }
+          return cardContent;
+        })}
       </View>
 
       {/* Recent Queries */}
