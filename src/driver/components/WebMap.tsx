@@ -15,6 +15,8 @@ const STATUS_COLOR: Record<string, string> = {
   offline: '#5A6482',
 };
 
+const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || '';
+
 /**
  * Compute a reasonable initial map center and zoom level.
  *
@@ -90,6 +92,192 @@ function buildMapHtml(
     ? JSON.stringify({ lat: userLocation.latitude, lng: userLocation.longitude })
     : 'null';
 
+  // If no API key, fall back to OpenStreetMap via Leaflet
+  if (!GOOGLE_MAPS_KEY) {
+    return buildFallbackHtml(markersJson, userLocJson, lat, lng, zoom);
+  }
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body,#map{width:100%;height:100%;background:#0A0E1A}
+/* Dark-themed info window overrides */
+.gm-style-iw{background:#141B2D !important;border-radius:12px !important;padding:0 !important}
+.gm-style-iw-d{overflow:auto !important}
+.gm-style-iw-tc::after{background:#141B2D !important}
+.gm-ui-hover-effect{filter:invert(1)}
+.gm-style-iw-chr{position:absolute;top:4px;right:4px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+var stations=${markersJson};
+var userLoc=${userLocJson};
+
+var DARK_STYLE=[
+  {elementType:'geometry',stylers:[{color:'#0A0E1A'}]},
+  {elementType:'labels.text.stroke',stylers:[{color:'#0A0E1A'}]},
+  {elementType:'labels.text.fill',stylers:[{color:'#5A6482'}]},
+  {featureType:'road',elementType:'geometry',stylers:[{color:'#1C2438'}]},
+  {featureType:'road',elementType:'geometry.stroke',stylers:[{color:'#2A3350'}]},
+  {featureType:'road.highway',elementType:'geometry',stylers:[{color:'#232B42'}]},
+  {featureType:'water',elementType:'geometry',stylers:[{color:'#0e1626'}]},
+  {featureType:'water',elementType:'labels.text.fill',stylers:[{color:'#5A6482'}]},
+  {featureType:'poi',elementType:'geometry',stylers:[{color:'#141B2D'}]},
+  {featureType:'poi',elementType:'labels.text.fill',stylers:[{color:'#5A6482'}]},
+  {featureType:'poi.park',elementType:'geometry',stylers:[{color:'#111927'}]},
+  {featureType:'transit',elementType:'geometry',stylers:[{color:'#1C2438'}]},
+  {featureType:'administrative',elementType:'geometry.stroke',stylers:[{color:'#2A3350'}]}
+];
+
+function createMarkerIcon(color,isHighlighted){
+  var size=isHighlighted?16:12;
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+(size*2)+'" height="'+(size*2)+'" viewBox="0 0 '+(size*2)+' '+(size*2)+'">' +
+    '<circle cx="'+size+'" cy="'+size+'" r="'+(size-1)+'" fill="'+color+'" stroke="#FFFFFF" stroke-width="2" opacity="0.9"/>' +
+    '<circle cx="'+size+'" cy="'+size+'" r="'+(size/2)+'" fill="#FFFFFF" opacity="0.4"/>' +
+    '</svg>';
+  return {
+    url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg),
+    scaledSize:new google.maps.Size(size*2,size*2),
+    anchor:new google.maps.Point(size,size)
+  };
+}
+
+function createInfoContent(s){
+  return '<div style="background:#141B2D;color:#F0F4FF;padding:12px;border-radius:10px;min-width:220px;font-family:system-ui,-apple-system,sans-serif;">' +
+    '<div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#F0F4FF;">' + s.name + '</div>' +
+    '<div style="font-size:12px;color:#8892B0;margin-bottom:2px;">' + s.provider + '</div>' +
+    (s.address ? '<div style="font-size:11px;color:#5A6482;margin-bottom:4px;">' + s.address + '</div>' : '') +
+    (s.connectors ? '<div style="font-size:11px;color:#F0F4FF;margin-bottom:4px;">' + s.connectors + '</div>' : '') +
+    (s.distance ? '<div style="font-size:11px;color:#00D4FF;font-weight:600;margin-bottom:6px;">' + s.distance + ' away</div>' : '') +
+    '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#FFFFFF;background:' + s.color + ';">' + s.status + '</span>' +
+    '</div>';
+}
+
+function initMap(){
+  var map=new google.maps.Map(document.getElementById('map'),{
+    center:{lat:${lat},lng:${lng}},
+    zoom:${zoom},
+    styles:DARK_STYLE,
+    disableDefaultUI:false,
+    zoomControl:true,
+    mapTypeControl:true,
+    streetViewControl:true,
+    fullscreenControl:false,
+    gestureHandling:'greedy',
+    backgroundColor:'#0A0E1A'
+  });
+
+  var openInfoWindow=null;
+
+  // User location marker
+  if(userLoc){
+    new google.maps.Marker({
+      position:userLoc,
+      map:map,
+      icon:{
+        url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="8" fill="#00D4FF" stroke="#FFFFFF" stroke-width="3" opacity="0.9"/></svg>'
+        ),
+        scaledSize:new google.maps.Size(24,24),
+        anchor:new google.maps.Point(12,12)
+      },
+      title:'Your Location',
+      zIndex:999
+    });
+
+    new google.maps.Circle({
+      center:userLoc,
+      radius:300,
+      fillColor:'#00D4FF',
+      fillOpacity:0.08,
+      strokeColor:'#00D4FF',
+      strokeWeight:1,
+      strokeOpacity:0.3,
+      map:map
+    });
+  }
+
+  // Station markers
+  stations.forEach(function(s){
+    var marker=new google.maps.Marker({
+      position:{lat:s.latitude,lng:s.longitude},
+      map:map,
+      icon:createMarkerIcon(s.color,false),
+      title:s.name,
+      zIndex:10
+    });
+
+    var infoWindow=new google.maps.InfoWindow({
+      content:createInfoContent(s),
+      maxWidth:300
+    });
+
+    marker.addListener('click',function(){
+      if(openInfoWindow) openInfoWindow.close();
+      infoWindow.open(map,marker);
+      openInfoWindow=infoWindow;
+      // Highlight this marker
+      marker.setIcon(createMarkerIcon(s.color,true));
+    });
+
+    infoWindow.addListener('closeclick',function(){
+      marker.setIcon(createMarkerIcon(s.color,false));
+      openInfoWindow=null;
+    });
+  });
+
+  // Fit bounds: user + nearest 5 stations
+  if(userLoc && stations.length>0){
+    var nearSorted=stations.slice().sort(function(a,b){
+      var da=Math.abs(a.latitude-userLoc.lat)+Math.abs(a.longitude-userLoc.lng);
+      var db=Math.abs(b.latitude-userLoc.lat)+Math.abs(b.longitude-userLoc.lng);
+      return da-db;
+    });
+    var bounds=new google.maps.LatLngBounds();
+    bounds.extend(new google.maps.LatLng(userLoc.lat,userLoc.lng));
+    nearSorted.slice(0,5).forEach(function(s){
+      bounds.extend(new google.maps.LatLng(s.latitude,s.longitude));
+    });
+    map.fitBounds(bounds,{top:40,right:40,bottom:40,left:40});
+    // Cap zoom so we don't get too close
+    var listener=google.maps.event.addListener(map,'idle',function(){
+      if(map.getZoom()>13) map.setZoom(13);
+      google.maps.event.removeListener(listener);
+    });
+  } else if(!userLoc && stations.length>1){
+    var bounds=new google.maps.LatLngBounds();
+    stations.forEach(function(s){
+      bounds.extend(new google.maps.LatLng(s.latitude,s.longitude));
+    });
+    map.fitBounds(bounds,{top:40,right:40,bottom:40,left:40});
+    var listener=google.maps.event.addListener(map,'idle',function(){
+      if(map.getZoom()>13) map.setZoom(13);
+      google.maps.event.removeListener(listener);
+    });
+  }
+}
+<\/script>
+<script src="https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&callback=initMap" async defer><\/script>
+</body>
+</html>`;
+}
+
+/**
+ * Fallback to Leaflet/OpenStreetMap when no Google Maps API key is configured.
+ */
+function buildFallbackHtml(
+  markersJson: string,
+  userLocJson: string,
+  lat: number,
+  lng: number,
+  zoom: number
+): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -99,12 +287,6 @@ function buildMapHtml(
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body,#map{width:100%;height:100%}
-.popup-name{font-weight:700;font-size:14px;margin-bottom:4px}
-.popup-provider{font-size:12px;color:#8892B0;margin-bottom:2px}
-.popup-address{font-size:11px;color:#5A6482;margin-bottom:4px}
-.popup-connectors{font-size:11px;color:#F0F4FF;margin-bottom:4px}
-.popup-distance{font-size:11px;color:#00D4FF;font-weight:600;margin-bottom:6px}
-.popup-status{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#FFFFFF}
 </style>
 </head>
 <body>
@@ -115,33 +297,26 @@ var stations=${markersJson};
 var userLoc=${userLocJson};
 var map=L.map('map').setView([${lat},${lng}],${zoom});
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'OpenStreetMap'}).addTo(map);
-
-// Plot user location if known
 if(userLoc){
   L.circleMarker([userLoc.lat,userLoc.lng],{radius:8,fillColor:'#00D4FF',color:'#FFFFFF',weight:3,fillOpacity:1}).addTo(map).bindPopup('<b>You are here</b>');
   L.circle([userLoc.lat,userLoc.lng],{radius:300,fillColor:'#00D4FF',color:'#00D4FF',weight:1,fillOpacity:0.1}).addTo(map);
 }
-
-// Plot stations
 var bounds=[];
 stations.forEach(function(s){
   bounds.push([s.latitude,s.longitude]);
   L.circleMarker([s.latitude,s.longitude],{
     radius:10,fillColor:s.color,color:'#FFFFFF',weight:2,fillOpacity:0.9
   }).addTo(map).bindPopup(
-    '<div class="popup-name">'+s.name+'</div>'+
-    '<div class="popup-provider">'+s.provider+'</div>'+
-    (s.address?'<div class="popup-address">'+s.address+'</div>':'')+
-    (s.connectors?'<div class="popup-connectors">'+s.connectors+'</div>':'')+
-    (s.distance?'<div class="popup-distance">'+s.distance+' away</div>':'')+
-    '<span class="popup-status" style="background:'+s.color+'">'+s.status+'</span>'
+    '<div style="font-weight:700;font-size:14px;margin-bottom:4px">'+s.name+'</div>'+
+    '<div style="font-size:12px;color:#8892B0;margin-bottom:2px">'+s.provider+'</div>'+
+    (s.address?'<div style="font-size:11px;color:#5A6482;margin-bottom:4px">'+s.address+'</div>':'')+
+    (s.connectors?'<div style="font-size:11px;margin-bottom:4px">'+s.connectors+'</div>':'')+
+    (s.distance?'<div style="font-size:11px;color:#00D4FF;font-weight:600;margin-bottom:6px">'+s.distance+' away</div>':'')+
+    '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#FFF;background:'+s.color+'">'+s.status+'</span>'
   );
 });
-
-// If we have both user location and stations, fit the map to show user + nearest stations
-if(userLoc && bounds.length>0){
+if(userLoc&&bounds.length>0){
   bounds.push([userLoc.lat,userLoc.lng]);
-  // Show at most the 5 nearest stations in the initial view
   var nearSorted=stations.slice().sort(function(a,b){
     var da=Math.abs(a.latitude-userLoc.lat)+Math.abs(a.longitude-userLoc.lng);
     var db=Math.abs(b.latitude-userLoc.lat)+Math.abs(b.longitude-userLoc.lng);
@@ -150,7 +325,7 @@ if(userLoc && bounds.length>0){
   var fitBounds=[[userLoc.lat,userLoc.lng]];
   nearSorted.slice(0,5).forEach(function(s){fitBounds.push([s.latitude,s.longitude]);});
   try{map.fitBounds(fitBounds,{padding:[40,40],maxZoom:13});}catch(e){}
-} else if(!userLoc && bounds.length>1){
+}else if(!userLoc&&bounds.length>1){
   try{map.fitBounds(bounds,{padding:[40,40],maxZoom:13});}catch(e){}
 }
 <\/script>
