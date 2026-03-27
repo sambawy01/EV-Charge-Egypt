@@ -16,7 +16,7 @@ import { FleetSettingsScreen } from '@/fleet/screens/FleetSettingsScreen';
 import { CreditTopUpScreen } from '@/fleet/screens/CreditTopUpScreen';
 import { MemberManagementScreen } from '@/fleet/screens/MemberManagementScreen';
 import { BillingScreen } from '@/fleet/screens/BillingScreen';
-import { colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -75,13 +75,19 @@ function SettingsStack() {
 }
 
 export function FleetNavigator() {
+  const { colors } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,
-        tabBarStyle: { borderTopColor: colors.border },
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          borderTopWidth: 1,
+        },
       }}
     >
       <Tab.Screen
