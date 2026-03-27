@@ -767,7 +767,7 @@ export function VehicleDashboardScreen({ navigation }: any) {
                 key={i}
                 style={{
                   width: '48.5%',
-                  aspectRatio: 1,
+                  minHeight: 150,
                   backgroundColor: colors.surface,
                   borderWidth: 1.5,
                   borderColor: outlineColor,
