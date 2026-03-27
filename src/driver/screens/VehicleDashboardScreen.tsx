@@ -73,10 +73,10 @@ function MetricCard({
         minWidth: (SCREEN_WIDTH - 60) / 2,
       }}
     >
-      <Text style={{ ...typography.mono, fontSize: 22, color: valueColor, marginBottom: 4 }}>
+      <Text style={{ ...typography.mono, fontSize: 28, color: valueColor, marginBottom: 6 }}>
         {value}
       </Text>
-      <Text style={{ ...typography.caption, color: colors.textSecondary }}>{label}</Text>
+      <Text style={{ ...typography.body, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>{label}</Text>
     </View>
   );
 }
@@ -444,7 +444,7 @@ export function VehicleDashboardScreen({ navigation }: any) {
         >
           <Text style={{ fontSize: 20 }}>{'\uD83C\uDF21\uFE0F'}</Text>
           <View style={{ flex: 1 }}>
-            <Text style={{ ...typography.bodyBold, color: colors.text, marginBottom: 4 }}>
+            <Text style={{ ...typography.h3, fontSize: 16, color: colors.text, marginBottom: 6 }}>
               Temperature Impact:{' '}
               <Text
                 style={{
@@ -460,7 +460,7 @@ export function VehicleDashboardScreen({ navigation }: any) {
                   battery.temperatureImpact.slice(1)}
               </Text>
             </Text>
-            <Text style={{ ...typography.caption, color: colors.textSecondary, lineHeight: 20 }}>
+            <Text style={{ ...typography.body, fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 22 }}>
               {battery.temperatureNote}
             </Text>
           </View>
