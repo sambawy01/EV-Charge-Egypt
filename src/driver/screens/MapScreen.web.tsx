@@ -1,18 +1,26 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+} from 'react-native';
 import { useStations } from '@/core/queries/useStations';
 import { useMapStore } from '@/core/stores/mapStore';
 import { WebMap } from '../components/WebMap';
-import { StationListItem } from '../components/StationListItem';
-import { SearchBar } from '../components/SearchBar';
 import { FilterModal } from '../components/FilterModal';
 import { LoadingScreen } from '@/core/components';
 import { colors } from '@/core/theme/colors';
-import { spacing } from '@/core/theme/spacing';
+import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 import type { Station } from '@/core/types/station';
 
-// Get user location — returns null while loading, then the location or a fallback
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
 function useWebLocation() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [resolved, setResolved] = useState(false);
@@ -26,21 +34,87 @@ function useWebLocation() {
         setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
         setResolved(true);
       },
-      () => setResolved(true), // denied or error — proceed without location
+      () => setResolved(true),
       { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
     );
   }, []);
   return { location, resolved };
 }
 
+// ---------------------------------------------------------------------------
+// Filter chip definitions
+// ---------------------------------------------------------------------------
+
+const FILTER_CHIPS = ['All', 'CCS', 'Type 2', 'CHAdeMO', 'DC Fast', 'Available'] as const;
+type FilterChip = (typeof FILTER_CHIPS)[number];
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getMaxPowerKw(station: Station): number | null {
+  if (!station.connectors || station.connectors.length === 0) return null;
+  return Math.max(...station.connectors.map((c) => c.power_kw));
+}
+
+function getStatusColor(station: Station): string {
+  switch (station.status) {
+    case 'available':
+      return colors.statusAvailable;
+    case 'partial':
+      return colors.statusPartial;
+    case 'occupied':
+      return colors.statusOccupied;
+    case 'offline':
+      return colors.statusOffline;
+    default:
+      return colors.statusAvailable;
+  }
+}
+
+function matchesChipFilter(station: Station, chip: FilterChip): boolean {
+  if (chip === 'All') return true;
+  if (chip === 'Available') return station.status === 'available';
+  if (chip === 'DC Fast') {
+    return (station.connectors || []).some((c) => c.power_kw >= 50);
+  }
+  // Connector type filters
+  const typeMap: Record<string, string> = { CCS: 'CCS', 'Type 2': 'Type2', CHAdeMO: 'CHAdeMO' };
+  const connectorType = typeMap[chip];
+  if (connectorType) {
+    return (station.connectors || []).some((c) => c.type === connectorType);
+  }
+  return true;
+}
+
+function buildPanelTitle(
+  stations: Station[],
+  searchQuery: string,
+  userLocation: { latitude: number; longitude: number } | null
+): string {
+  const count = stations.length;
+  const noun = count === 1 ? 'station' : 'stations';
+  if (searchQuery) return `${count} ${noun} for "${searchQuery}"`;
+  if (count === 0) return 'No stations nearby';
+  const nearest = stations[0];
+  if (nearest?.distance_km != null && userLocation) {
+    if (nearest.distance_km < 50) return `${count} ${noun} near you`;
+    return `${count} ${noun} in Egypt (nearest ${Math.round(nearest.distance_km)} km away)`;
+  }
+  return `${count} ${noun} in Egypt`;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
 export function MapScreen({ navigation }: any) {
   const { searchQuery, filters, setSearchQuery, setFilters } = useMapStore();
   const [showFilter, setShowFilter] = useState(false);
-  const [listExpanded, setListExpanded] = useState(false);
+  const [activeChip, setActiveChip] = useState<FilterChip>('All');
   const { location: userLocation, resolved: gpsResolved } = useWebLocation();
 
-  // Pass user location to the query so results are proximity-sorted
-  const { data: stations, isLoading, error } = useStations(filters, userLocation);
+  const { data: stations, isLoading } = useStations(filters, userLocation);
 
   const handleStationPress = useCallback(
     (station: Station) => {
@@ -49,38 +123,157 @@ export function MapScreen({ navigation }: any) {
     [navigation]
   );
 
-  // Filter stations by search query locally
+  // Local search + chip filtering
   const filteredStations = (stations || []).filter((s) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      s.name.toLowerCase().includes(q) ||
-      (s.address ?? '').toLowerCase().includes(q) ||
-      (s.area ?? '').toLowerCase().includes(q) ||
-      (s.provider?.name ?? '').toLowerCase().includes(q)
-    );
+    // Text search
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchesText =
+        s.name.toLowerCase().includes(q) ||
+        (s.address ?? '').toLowerCase().includes(q) ||
+        (s.area ?? '').toLowerCase().includes(q) ||
+        (s.provider?.name ?? '').toLowerCase().includes(q);
+      if (!matchesText) return false;
+    }
+    // Chip filter
+    return matchesChipFilter(s, activeChip);
   });
 
-  // Wait for GPS before rendering the map so it centers on the user
   if (!gpsResolved || isLoading) return <LoadingScreen message="Finding your location..." />;
 
-  const listData = filteredStations.slice(0, listExpanded ? 40 : 8);
-
-  // Build the panel title based on context
   const panelTitle = buildPanelTitle(filteredStations, searchQuery, userLocation);
 
   return (
-    <View style={styles.container}>
-      {/* Search bar overlay */}
-      <View style={styles.searchOverlay}>
-        <SearchBar
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onFilterPress={() => setShowFilter(true)}
-        />
+    <View style={styles.root}>
+      {/* ---- Left Station Panel ---- */}
+      <View style={styles.panel}>
+        {/* Search */}
+        <View style={styles.searchSection}>
+          <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>{'\uD83D\uDD0D'}</Text>
+            <TextInput
+              placeholder="Search stations..."
+              placeholderTextColor={colors.textTertiary}
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            <TouchableOpacity onPress={() => setShowFilter(true)} style={styles.filterButton}>
+              <Text style={styles.filterIcon}>{'\u2699\uFE0F'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Filter chips */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsContainer}
+          >
+            {FILTER_CHIPS.map((chip) => {
+              const isActive = activeChip === chip;
+              return (
+                <TouchableOpacity
+                  key={chip}
+                  onPress={() => setActiveChip(chip)}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: isActive ? colors.primaryLight : colors.surfaceSecondary,
+                      borderColor: isActive ? colors.primary : colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: isActive ? colors.primary : colors.textSecondary },
+                    ]}
+                  >
+                    {chip}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        {/* Station count */}
+        <View style={styles.countRow}>
+          <Text style={styles.countText}>{panelTitle}</Text>
+        </View>
+
+        {/* Station list */}
+        <ScrollView style={styles.stationList} showsVerticalScrollIndicator={false}>
+          {filteredStations.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyTitle}>No stations found</Text>
+              <Text style={styles.emptySubtitle}>
+                {searchQuery
+                  ? `No results for "${searchQuery}". Try a different search.`
+                  : 'No EV charging stations match your filters.'}
+              </Text>
+            </View>
+          ) : (
+            filteredStations.map((station) => {
+              const powerKw = getMaxPowerKw(station);
+              const statusColor = getStatusColor(station);
+              const providerName = station.provider?.name ?? '';
+
+              return (
+                <TouchableOpacity
+                  key={station.id}
+                  onPress={() => handleStationPress(station)}
+                  style={styles.stationCard}
+                  activeOpacity={0.7}
+                >
+                  {/* Availability dot */}
+                  <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+
+                  {/* Info */}
+                  <View style={styles.stationInfo}>
+                    <Text style={styles.stationName} numberOfLines={1}>
+                      {station.name}
+                    </Text>
+                    <Text style={styles.stationAddress} numberOfLines={1}>
+                      {station.address || station.city || station.area || ''}
+                    </Text>
+                    <View style={styles.metaRow}>
+                      {powerKw != null && (
+                        <View style={styles.powerBadge}>
+                          <Text style={styles.powerText}>{powerKw} kW</Text>
+                        </View>
+                      )}
+                      {station.connectors && station.connectors.length > 0 && (
+                        <View style={styles.connectorBadge}>
+                          <Text style={styles.connectorText}>
+                            {Array.from(new Set(station.connectors.map((c) => c.type))).join(' / ')}
+                          </Text>
+                        </View>
+                      )}
+                      {providerName ? (
+                        <Text style={styles.providerText}>{providerName}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+
+                  {/* Distance */}
+                  {station.distance_km != null && (
+                    <Text style={styles.distanceText}>
+                      {station.distance_km < 1
+                        ? `${Math.round(station.distance_km * 1000)} m`
+                        : `${station.distance_km.toFixed(1)} km`}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })
+          )}
+          {/* Bottom spacer */}
+          <View style={{ height: spacing.xl }} />
+        </ScrollView>
       </View>
 
-      {/* Leaflet map takes the top portion */}
+      {/* ---- Map fills remaining space ---- */}
       <View style={styles.mapContainer}>
         <WebMap
           stations={filteredStations}
@@ -89,42 +282,7 @@ export function MapScreen({ navigation }: any) {
         />
       </View>
 
-      {/* Station list panel at the bottom */}
-      <View style={[styles.listPanel, listExpanded && styles.listPanelExpanded]}>
-        <TouchableOpacity
-          style={styles.panelHandle}
-          onPress={() => setListExpanded((v) => !v)}
-          activeOpacity={0.7}
-        >
-          <View style={styles.handle} />
-          <Text style={styles.panelTitle}>{panelTitle}</Text>
-          <Text style={styles.expandHint}>{listExpanded ? 'Show less' : 'Show more'}</Text>
-        </TouchableOpacity>
-
-        {filteredStations.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>No stations found</Text>
-            <Text style={styles.emptySubtitle}>
-              {searchQuery
-                ? `No results for "${searchQuery}". Try a different search.`
-                : 'No EV charging stations found within 200 km. More stations are being added to Egypt regularly.'}
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={listData}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <StationListItem station={item} onPress={() => handleStationPress(item)} />
-            )}
-            contentContainerStyle={{ paddingBottom: spacing.xl }}
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={listExpanded}
-            keyboardShouldPersistTaps="handled"
-          />
-        )}
-      </View>
-
+      {/* Filter modal */}
       <FilterModal
         visible={showFilter}
         onClose={() => setShowFilter(false)}
@@ -136,114 +294,166 @@ export function MapScreen({ navigation }: any) {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function buildPanelTitle(
-  stations: Station[],
-  searchQuery: string,
-  userLocation: { latitude: number; longitude: number } | null
-): string {
-  const count = stations.length;
-  const noun = count === 1 ? 'station' : 'stations';
-
-  if (searchQuery) {
-    return `${count} ${noun} for "${searchQuery}"`;
-  }
-
-  if (count === 0) {
-    return 'No stations nearby';
-  }
-
-  // If we have distances, describe proximity
-  const nearest = stations[0];
-  if (nearest?.distance_km != null && userLocation) {
-    if (nearest.distance_km < 50) {
-      return `${count} ${noun} near you`;
-    }
-    return `${count} ${noun} in Egypt (nearest ${Math.round(nearest.distance_km)} km away)`;
-  }
-
-  return `${count} ${noun} in Egypt`;
-}
-
-// ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
 
-const LIST_PANEL_DEFAULT = 280;
-const LIST_PANEL_EXPANDED = 520;
+const PANEL_WIDTH = 340;
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
+    flexDirection: 'row',
     backgroundColor: colors.background,
   },
-  searchOverlay: {
-    position: 'absolute',
-    top: 12,
-    left: 0,
-    right: 0,
-    zIndex: 20,
-    paddingHorizontal: spacing.md,
-  },
-  mapContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    // map fills the screen minus the collapsed list panel
-    bottom: LIST_PANEL_DEFAULT,
-  },
-  listPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: LIST_PANEL_DEFAULT,
+
+  // -- Station panel (left) --
+  panel: {
+    width: PANEL_WIDTH,
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 8,
-    overflow: 'hidden' as any,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
   },
-  listPanelExpanded: {
-    height: LIST_PANEL_EXPANDED,
-  },
-  panelHandle: {
-    paddingTop: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xs,
+  searchSection: {
+    padding: spacing.md,
+    gap: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.border,
-    marginRight: spacing.sm,
+  searchIcon: {
+    fontSize: 14,
+    marginRight: 8,
   },
-  panelTitle: {
-    ...typography.bodyBold,
+  searchInput: {
+    flex: 1,
     color: colors.text,
+    fontSize: 14,
+    // @ts-ignore web outline
+    outlineStyle: 'none',
+  },
+  filterButton: {
+    marginLeft: 4,
+    padding: 4,
+  },
+  filterIcon: {
+    fontSize: 16,
+  },
+
+  // Chips
+  chipsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  // Count
+  countRow: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  countText: {
+    ...typography.caption,
+    color: colors.textTertiary,
+  },
+
+  // Station list
+  stationList: {
     flex: 1,
   },
-  expandHint: {
+  stationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 12,
+    flexShrink: 0,
+  },
+  stationInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  stationName: {
+    ...typography.bodyBold,
+    color: colors.text,
+    fontSize: 14,
+  },
+  stationAddress: {
     ...typography.caption,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+    flexWrap: 'wrap',
+  },
+  powerBadge: {
+    backgroundColor: colors.primaryLight,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  powerText: {
+    fontSize: 10,
     color: colors.primary,
     fontWeight: '600',
   },
+  connectorBadge: {
+    backgroundColor: colors.surfaceTertiary,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  connectorText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  providerText: {
+    fontSize: 10,
+    color: colors.textTertiary,
+  },
+  distanceText: {
+    fontFamily: 'SpaceGrotesk-SemiBold',
+    fontSize: 13,
+    color: colors.primary,
+    marginLeft: 8,
+    flexShrink: 0,
+  },
+
+  // Empty state
   emptyContainer: {
-    flex: 1,
+    paddingTop: 60,
     alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
   emptyTitle: {
@@ -255,5 +465,10 @@ const styles = StyleSheet.create({
     ...typography.caption,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+
+  // -- Map (right) --
+  mapContainer: {
+    flex: 1,
   },
 });
