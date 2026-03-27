@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from '@/core/theme';
@@ -88,47 +89,104 @@ function ProfileTabStack() {
   );
 }
 
+function SideTabBar({ state, descriptors, navigation }: any) {
+  const { colors } = useTheme();
+
+  const icons: Record<string, string> = {
+    MapTab: '\u{1F4CD}',
+    BookingsTab: '\u{1F4CB}',
+    AITab: '\u{1F916}',
+    WalletTab: '\u{1F4B3}',
+    ProfileTab: '\u{1F464}',
+  };
+
+  const labels: Record<string, string> = {
+    MapTab: 'Map',
+    BookingsTab: 'Bookings',
+    AITab: 'AI',
+    WalletTab: 'Wallet',
+    ProfileTab: 'Profile',
+  };
+
+  return (
+    <View
+      style={{
+        width: 72,
+        backgroundColor: colors.surface,
+        borderRightWidth: 1,
+        borderRightColor: colors.border,
+        paddingTop: 48,
+        paddingBottom: 24,
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        gap: 8,
+      }}
+    >
+      {/* Brand mark */}
+      <Text style={{ fontSize: 24, marginBottom: 24 }}>{'\u26A1'}</Text>
+
+      {state.routes.map((route: any, index: number) => {
+        const isFocused = state.index === index;
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={onPress}
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isFocused ? colors.primaryLight : 'transparent',
+            }}
+          >
+            <Text style={{ fontSize: 20 }}>{icons[route.name] || '\u25CF'}</Text>
+            <Text
+              style={{
+                fontSize: 9,
+                marginTop: 2,
+                color: isFocused ? colors.primary : colors.textTertiary,
+                fontWeight: isFocused ? '600' : '400',
+              }}
+            >
+              {labels[route.name] || route.name}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 export function DriverNavigator() {
   const { colors } = useTheme();
 
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textTertiary,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-        },
-      }}
-    >
-      <Tab.Screen
-        name="MapTab"
-        component={MapTabStack}
-        options={{ tabBarLabel: 'Map' }}
-      />
-      <Tab.Screen
-        name="BookingsTab"
-        component={BookingsTabStack}
-        options={{ tabBarLabel: 'Bookings' }}
-      />
-      <Tab.Screen
-        name="AITab"
-        component={AITabStack}
-        options={{ tabBarLabel: 'AI' }}
-      />
-      <Tab.Screen
-        name="WalletTab"
-        component={WalletTabStack}
-        options={{ tabBarLabel: 'Wallet' }}
-      />
-      <Tab.Screen
-        name="ProfileTab"
-        component={ProfileTabStack}
-        options={{ tabBarLabel: 'Profile' }}
-      />
-    </Tab.Navigator>
+    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.background }}>
+      <Tab.Navigator
+        tabBar={(props) => <SideTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+        }}
+        sceneContainerStyle={{ flex: 1 }}
+      >
+        <Tab.Screen name="MapTab" component={MapTabStack} />
+        <Tab.Screen name="BookingsTab" component={BookingsTabStack} />
+        <Tab.Screen name="AITab" component={AITabStack} />
+        <Tab.Screen name="WalletTab" component={WalletTabStack} />
+        <Tab.Screen name="ProfileTab" component={ProfileTabStack} />
+      </Tab.Navigator>
+    </View>
   );
 }

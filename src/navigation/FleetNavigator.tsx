@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { FleetHomeScreen } from '@/fleet/screens/FleetHomeScreen';
@@ -74,47 +75,104 @@ function SettingsStack() {
   );
 }
 
+function FleetSideTabBar({ state, descriptors, navigation }: any) {
+  const { colors } = useTheme();
+
+  const icons: Record<string, string> = {
+    FleetHome: '\u{1F4CA}',
+    VehiclesTab: '\u{1F697}',
+    ScheduleTab: '\u{1F4C5}',
+    ReportsTab: '\u{1F4C8}',
+    SettingsTab: '\u2699\uFE0F',
+  };
+
+  const labels: Record<string, string> = {
+    FleetHome: 'Dashboard',
+    VehiclesTab: 'Vehicles',
+    ScheduleTab: 'Schedule',
+    ReportsTab: 'Reports',
+    SettingsTab: 'Settings',
+  };
+
+  return (
+    <View
+      style={{
+        width: 72,
+        backgroundColor: colors.surface,
+        borderRightWidth: 1,
+        borderRightColor: colors.border,
+        paddingTop: 48,
+        paddingBottom: 24,
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        gap: 8,
+      }}
+    >
+      {/* Brand mark */}
+      <Text style={{ fontSize: 24, marginBottom: 24 }}>{'\u26A1'}</Text>
+
+      {state.routes.map((route: any, index: number) => {
+        const isFocused = state.index === index;
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={onPress}
+            style={{
+              width: 56,
+              height: 56,
+              borderRadius: 12,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: isFocused ? colors.primaryLight : 'transparent',
+            }}
+          >
+            <Text style={{ fontSize: 20 }}>{icons[route.name] || '\u25CF'}</Text>
+            <Text
+              style={{
+                fontSize: 9,
+                marginTop: 2,
+                color: isFocused ? colors.primary : colors.textTertiary,
+                fontWeight: isFocused ? '600' : '400',
+              }}
+            >
+              {labels[route.name] || route.name}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 export function FleetNavigator() {
   const { colors } = useTheme();
 
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textTertiary,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          borderTopWidth: 1,
-        },
-      }}
-    >
-      <Tab.Screen
-        name="Dashboard"
-        component={DashboardStack}
-        options={{ tabBarLabel: 'Dashboard' }}
-      />
-      <Tab.Screen
-        name="Vehicles"
-        component={VehiclesStack}
-        options={{ tabBarLabel: 'Vehicles' }}
-      />
-      <Tab.Screen
-        name="Schedule"
-        component={ScheduleStack}
-        options={{ tabBarLabel: 'Schedule' }}
-      />
-      <Tab.Screen
-        name="Reports"
-        component={ReportsStack}
-        options={{ tabBarLabel: 'Reports' }}
-      />
-      <Tab.Screen
-        name="FleetSettings"
-        component={SettingsStack}
-        options={{ tabBarLabel: 'Settings' }}
-      />
-    </Tab.Navigator>
+    <View style={{ flex: 1, flexDirection: 'row', backgroundColor: colors.background }}>
+      <Tab.Navigator
+        tabBar={(props) => <FleetSideTabBar {...props} />}
+        screenOptions={{
+          headerShown: false,
+        }}
+        sceneContainerStyle={{ flex: 1 }}
+      >
+        <Tab.Screen name="FleetHome" component={DashboardStack} />
+        <Tab.Screen name="VehiclesTab" component={VehiclesStack} />
+        <Tab.Screen name="ScheduleTab" component={ScheduleStack} />
+        <Tab.Screen name="ReportsTab" component={ReportsStack} />
+        <Tab.Screen name="SettingsTab" component={SettingsStack} />
+      </Tab.Navigator>
+    </View>
   );
 }
