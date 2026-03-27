@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, Animated, Easing, Platform, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from '@/core/theme';
@@ -165,39 +166,45 @@ function GlowTab({ icon, label, isFocused, onPress, colors }: {
     outputRange: [10, 16, 10, 16, 10],
   });
 
+  const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
+
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
-      <Animated.View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 18,
-        paddingVertical: 12,
-        borderRadius: 12,
-        gap: 8,
-        backgroundColor: isFocused ? colors.surfaceTertiary : colors.surfaceSecondary,
-        borderWidth: 1.5,
-        borderColor: isFocused ? colors.primary : colors.secondary,
-        borderBottomWidth: isFocused ? 3 : 2,
-        borderBottomColor: isFocused ? colors.primaryDark : colors.secondaryDark,
-        shadowColor: isFocused ? colors.primary : colors.secondary,
-        shadowOffset: isFocused
-          ? { width: glowX as any, height: glowY as any }
-          : { width: 0, height: 0 },
-        shadowOpacity: isFocused ? (glowOpacity as any) : 0.35,
-        shadowRadius: isFocused ? (glowRadius as any) : 10,
-        elevation: isFocused ? 10 : 5,
-        transform: [{ scale: isFocused ? pulseAnim : 1 }],
-      }}>
+      <AnimatedGradient
+        colors={isFocused ? ['#00D4FF', '#8B5CF6', '#D946EF'] : ['#0e2a3d', '#1a1535', '#2a1230']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 18,
+          paddingVertical: 12,
+          borderRadius: 12,
+          gap: 8,
+          borderWidth: 1.5,
+          borderColor: isFocused ? '#D946EF' : '#00D4FF',
+          borderBottomWidth: isFocused ? 3 : 2,
+          borderBottomColor: isFocused ? '#8B5CF6' : '#0095CC',
+          shadowColor: isFocused ? '#D946EF' : '#00D4FF',
+          shadowOffset: isFocused
+            ? { width: glowX as any, height: glowY as any }
+            : { width: 0, height: 0 },
+          shadowOpacity: isFocused ? (glowOpacity as any) : 0.3,
+          shadowRadius: isFocused ? (glowRadius as any) : 8,
+          elevation: isFocused ? 10 : 5,
+          transform: [{ scale: isFocused ? pulseAnim : 1 }],
+        }}
+      >
         <Text style={{ fontSize: 18 }}>{icon}</Text>
         <Text style={{
           fontFamily: isFocused ? 'SpaceGrotesk-SemiBold' : undefined,
           fontSize: 14,
-          color: isFocused ? colors.primary : colors.white,
-          fontWeight: isFocused ? '600' : '400',
+          color: '#FFFFFF',
+          fontWeight: isFocused ? '700' : '400',
         }}>
           {label}
         </Text>
-      </Animated.View>
+      </AnimatedGradient>
     </TouchableOpacity>
   );
 }
