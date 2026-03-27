@@ -66,11 +66,16 @@ function MetricCard({
       style={{
         flex: 1,
         backgroundColor: colors.surface,
-        borderWidth: 1,
-        borderColor: colors.border,
+        borderWidth: 1.5,
+        borderColor: valueColor,
         borderRadius: 12,
         padding: 14,
         minWidth: (SCREEN_WIDTH - 60) / 2,
+        shadowColor: valueColor,
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.3,
+        shadowRadius: 10,
+        elevation: 5,
       }}
     >
       <Text style={{ ...typography.mono, fontSize: 28, color: valueColor, marginBottom: 6 }}>
