@@ -362,6 +362,38 @@ export function VehicleDashboardScreen({ navigation }: any) {
       </View>
 
       {/* ============================================================ */}
+      {/* PLAN A TRIP BUTTON                                           */}
+      {/* ============================================================ */}
+      <TouchableOpacity
+        onPress={() => navigation?.navigate?.('TripPlanner')}
+        activeOpacity={0.8}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.surfaceSecondary,
+          borderWidth: 1.5,
+          borderColor: colors.secondary,
+          borderRadius: 12,
+          paddingVertical: 14,
+          paddingHorizontal: 20,
+          gap: 8,
+          marginHorizontal: 20,
+          marginTop: 16,
+          shadowColor: colors.secondary,
+          shadowOpacity: 0.3,
+          shadowOffset: { width: 0, height: 2 },
+          shadowRadius: 10,
+          elevation: 5,
+        }}
+      >
+        <Text style={{ fontSize: 20 }}>{'\uD83D\uDDFA\uFE0F'}</Text>
+        <Text style={{ fontFamily: 'SpaceGrotesk-SemiBold', fontSize: 16, color: colors.secondary }}>
+          Plan a Trip
+        </Text>
+      </TouchableOpacity>
+
+      {/* ============================================================ */}
       {/* BATTERY HEALTH SECTION                                       */}
       {/* ============================================================ */}
       <View style={{ paddingHorizontal: 20, marginTop: 32 }}>

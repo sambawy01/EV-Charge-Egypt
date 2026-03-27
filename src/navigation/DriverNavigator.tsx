@@ -23,6 +23,9 @@ import { CostReportScreen } from '@/driver/screens/CostReportScreen';
 // Plan 7: Vehicle Dashboard screen
 import { VehicleDashboardScreen } from '@/driver/screens/VehicleDashboardScreen';
 
+// Plan 8: AI Trip Planner
+import { TripPlannerScreen } from '@/driver/screens/TripPlannerScreen';
+
 // Plan 6: Driver Profile screens
 import { ProfileScreen } from '@/driver/screens/ProfileScreen';
 import { VehicleScreen } from '@/driver/screens/VehicleScreen';
@@ -87,6 +90,7 @@ function VehicleTabStack() {
       <VehicleStack.Screen name="VehicleDashboard" component={VehicleDashboardScreen} />
       <VehicleStack.Screen name="VehicleList" component={VehicleScreen} />
       <VehicleStack.Screen name="AddVehicle" component={AddVehicleScreen} />
+      <VehicleStack.Screen name="TripPlanner" component={TripPlannerScreen} />
     </VehicleStack.Navigator>
   );
 }
