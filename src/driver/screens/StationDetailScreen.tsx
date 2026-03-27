@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,8 @@ import { Header, Card, Button, LoadingScreen } from '@/core/components';
 import { ConnectorRow } from '../components/ConnectorRow';
 import { AmenityBadge } from '../components/AmenityBadge';
 import { StationRating } from '../components/StationRating';
+import { StationReportButton } from '../components/StationReportButton';
+import { stationReportService, StationLiveStatus } from '@/core/services/stationReportService';
 import { colors } from '@/core/theme/colors';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
@@ -19,6 +21,13 @@ import { typography } from '@/core/theme/typography';
 export function StationDetailScreen({ route, navigation }: any) {
   const { stationId } = route.params;
   const { data: station, isLoading } = useStationDetail(stationId);
+  const [liveStatus, setLiveStatus] = useState<StationLiveStatus | null>(null);
+
+  useEffect(() => {
+    if (station?.id) {
+      stationReportService.getLiveStatus(station.id).then(setLiveStatus);
+    }
+  }, [station?.id]);
 
   if (isLoading || !station) return <LoadingScreen message="Loading station..." />;
 
@@ -44,6 +53,13 @@ export function StationDetailScreen({ route, navigation }: any) {
               stationName={station.name}
               currentRating={station.rating_avg}
               reviewCount={station.review_count}
+            />
+          </View>
+          <View style={{ marginTop: spacing.sm }}>
+            <StationReportButton
+              stationId={station.id}
+              stationName={station.name}
+              liveStatus={liveStatus}
             />
           </View>
         </Card>
