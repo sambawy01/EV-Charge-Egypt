@@ -65,23 +65,35 @@ function MetricCard({
     <View
       style={{
         flex: 1,
-        backgroundColor: colors.surface,
-        borderWidth: 1.5,
-        borderColor: valueColor,
-        borderRadius: 12,
-        padding: 14,
         minWidth: (SCREEN_WIDTH - 60) / 2,
         shadowColor: valueColor,
         shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.3,
-        shadowRadius: 10,
-        elevation: 5,
+        shadowOpacity: 0.15,
+        shadowRadius: 14,
+        elevation: 4,
+        borderRadius: 12,
       }}
     >
-      <Text style={{ ...typography.mono, fontSize: 28, color: valueColor, marginBottom: 6 }}>
-        {value}
-      </Text>
-      <Text style={{ ...typography.body, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>{label}</Text>
+      <LinearGradient
+        colors={[valueColor + '22', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          borderRadius: 12,
+          padding: 1,
+        }}
+      >
+        <View style={{
+          backgroundColor: colors.surface,
+          borderRadius: 11,
+          padding: 14,
+        }}>
+          <Text style={{ ...typography.mono, fontSize: 28, color: valueColor, marginBottom: 6 }}>
+            {value}
+          </Text>
+          <Text style={{ ...typography.body, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>{label}</Text>
+        </View>
+      </LinearGradient>
     </View>
   );
 }
