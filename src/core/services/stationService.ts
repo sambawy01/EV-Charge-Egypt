@@ -1,5 +1,6 @@
 import { supabase } from '../config/supabase';
 import { fetchEgyptStations } from './openChargeMapService';
+import { googleMapsService } from './googleMapsService';
 import type { Station, Connector, StationStatus } from '../types/station';
 
 export interface StationFilter {
@@ -58,6 +59,38 @@ export const stationService = {
         }
       } catch (ocmErr) {
         console.warn('[stationService] OCM merge skipped:', ocmErr);
+      }
+
+      // Also merge Google Maps EV stations
+      try {
+        const searchLat = latitude ?? 30.0444;
+        const searchLng = longitude ?? 31.2357;
+        const gmapStations = await googleMapsService.getEVStations(searchLat, searchLng, 50000);
+        if (gmapStations.length > 0) {
+          const existingNames = new Set(stations.map((s) => s.name.toLowerCase()));
+          const newGmap = gmapStations
+            .filter((g) => !existingNames.has(g.name.toLowerCase()))
+            .map((g) => ({
+              ...g,
+              provider_id: '',
+              external_station_id: g.id,
+              area: null,
+              amenities: [],
+              photos: [],
+              rating_avg: g.rating || 0,
+              review_count: 0,
+              is_active: true,
+              last_synced_at: null,
+              connectors: [],
+              status: 'available' as StationStatus,
+              city: null,
+            } as Station));
+          if (newGmap.length > 0) {
+            stations = [...stations, ...newGmap];
+          }
+        }
+      } catch (gmapErr) {
+        console.warn('[stationService] Google Maps merge skipped:', gmapErr);
       }
     } catch (err) {
       console.warn('[stationService] Supabase fetch failed, trying OCM:', err);

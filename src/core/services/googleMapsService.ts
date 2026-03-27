@@ -178,6 +178,35 @@ export const googleMapsService = {
     }
   },
 
+  // Fetch EV charging stations from Google Maps Places API
+  async getEVStations(lat: number, lng: number, radiusM: number = 50000): Promise<{
+    id: string; name: string; address: string; latitude: number; longitude: number;
+    rating?: number; provider_name?: string;
+  }[]> {
+    if (!GOOGLE_MAPS_KEY) return [];
+
+    try {
+      const url = `${PLACES_BASE}?location=${lat},${lng}&radius=${radiusM}&type=electric_vehicle_charging_station&key=${GOOGLE_MAPS_KEY}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status !== 'OK') return [];
+
+      return (data.results || []).map((place: any) => ({
+        id: `gmap-${place.place_id}`,
+        name: place.name,
+        address: place.vicinity || place.formatted_address || '',
+        latitude: place.geometry.location.lat,
+        longitude: place.geometry.location.lng,
+        rating: place.rating,
+        provider_name: 'Google Maps',
+      }));
+    } catch (err) {
+      console.warn('[googleMapsService] EV stations fetch failed:', err);
+      return [];
+    }
+  },
+
   // Autocomplete city/place suggestions
   async autocompletePlaces(query: string): Promise<{ description: string; placeId: string }[]> {
     if (!query || query.length < 2) return [];
