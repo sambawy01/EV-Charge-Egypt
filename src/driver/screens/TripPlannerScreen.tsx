@@ -322,11 +322,11 @@ export function TripPlannerScreen({ navigation }: any) {
       const chargeToPercent = chargingStrategy === 'quick' ? 65 : 85;
       const chargeAmount = Math.max(chargeToPercent - arrivalBattery, 0);
       const chargeKwh = (chargeAmount / 100) * vehicleBatteryKwh;
-      const chargeSpeed = parseInt(
-        (stop.chargerType || 'CCS2 50kW').match(/\d+/)?.[0] || '50',
-        10,
-      );
-      const chargeDuration = Math.round((chargeKwh / chargeSpeed) * 60);
+      const chargerStr = stop.chargerType || 'CCS2 50kW';
+      // Extract kW value — match number before "kW" or "kw", or last number in string
+      const kwMatch = chargerStr.match(/(\d+)\s*kW/i);
+      const chargeSpeed = kwMatch ? parseInt(kwMatch[1], 10) : 50;
+      const chargeDuration = Math.min(Math.round((chargeKwh / Math.max(chargeSpeed, 10)) * 60), 90);
       const chargeCost = Math.round(chargeKwh * 3.5);
 
       currentBattery = chargeToPercent;
