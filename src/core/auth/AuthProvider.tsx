@@ -6,7 +6,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setSession, clearUser, setLoading } = useAuthStore();
 
   useEffect(() => {
-    // Initialize auth state from existing session
+    // Initialize auth state from existing session.
+    // IMPORTANT: Do NOT call clearUser() if a user is already set — signup may
+    // have just called setUser() with a local profile (no Supabase session yet,
+    // because email confirmation is enabled). Calling clearUser() here would
+    // immediately undo that and bounce the user back to the login screen.
     authService.getSession().then(async (session) => {
       if (session?.user) {
         const profile = await authService.getProfile(session.user.id);
@@ -14,10 +18,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(profile);
           setSession(session);
         } else {
-          clearUser();
+          // Session exists but no profile row — only clear if nobody else set the user
+          const currentState = useAuthStore.getState();
+          if (!currentState.isAuthenticated) {
+            clearUser();
+          }
         }
       } else {
-        clearUser();
+        // No Supabase session — only clear if signup didn't just authenticate locally
+        const currentState = useAuthStore.getState();
+        if (!currentState.isAuthenticated) {
+          clearUser();
+        }
       }
       setLoading(false);
     });

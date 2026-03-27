@@ -12,48 +12,40 @@ export const authService = {
     if (authError) throw authError;
     if (!authData.user) throw new Error('Sign up failed — please try again');
 
-    // If email confirmation is required, user won't have a session yet
-    // Try to sign in immediately (works when email confirm is disabled)
-    if (!authData.session) {
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) {
-        // Email confirmation is likely required — create profile anyway and inform user
-        // Use the user ID from signup to create profile via anon (RLS permitting) or just return a mock
-        return {
-          id: authData.user.id,
-          role,
-          full_name: fullName,
-          phone: null,
-          avatar_url: null,
-          preferred_lang: 'en',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as UserProfile;
-      }
+    const userId = authData.user.id;
+
+    // Build a local profile from the signup inputs so we always have something
+    // to return — even if DB insert or auto sign-in fails (e.g. email confirm ON).
+    const localProfile: UserProfile = {
+      id: userId,
+      role,
+      full_name: fullName,
+      phone: null,
+      avatar_url: null,
+      preferred_lang: 'en',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as UserProfile;
+
+    // Best-effort: persist profile in DB (may fail due to RLS without session)
+    try {
+      await supabase
+        .from('user_profiles')
+        .upsert({ id: userId, role, full_name: fullName }, { onConflict: 'id' });
+    } catch {
+      // Swallow — profile will be created on first real session
     }
 
-    // Create profile — try insert, ignore if already exists
-    const { data: profile, error: profileError } = await supabase
-      .from('user_profiles')
-      .upsert({ id: authData.user.id, role, full_name: fullName }, { onConflict: 'id' })
-      .select()
-      .single();
-
-    if (profileError) {
-      // If RLS blocks insert, return a local profile so the user can still use the app
-      return {
-        id: authData.user.id,
-        role,
-        full_name: fullName,
-        phone: null,
-        avatar_url: null,
-        preferred_lang: 'en',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      } as UserProfile;
+    // Best-effort: auto sign-in (works only when email confirmation is OFF)
+    try {
+      await supabase.auth.signInWithPassword({ email, password });
+    } catch {
+      // Expected to fail when email confirmation is required
     }
 
-    return profile;
+    // Always return the profile — useAuth.signUp calls setUser() with this,
+    // which sets isAuthenticated = true regardless of session state.
+    return localProfile;
   },
 
   async signIn(email: string, password: string): Promise<{ profile: UserProfile; session: any }> {
