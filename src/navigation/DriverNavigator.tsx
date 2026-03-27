@@ -20,6 +20,9 @@ import { AIAssistantScreen } from '@/driver/screens/AIAssistantScreen';
 import { RouteResultScreen } from '@/driver/screens/RouteResultScreen';
 import { CostReportScreen } from '@/driver/screens/CostReportScreen';
 
+// Plan 7: Vehicle Dashboard screen
+import { VehicleDashboardScreen } from '@/driver/screens/VehicleDashboardScreen';
+
 // Plan 6: Driver Profile screens
 import { ProfileScreen } from '@/driver/screens/ProfileScreen';
 import { VehicleScreen } from '@/driver/screens/VehicleScreen';
@@ -32,6 +35,7 @@ const MapStack = createNativeStackNavigator();
 const BookingsStack = createNativeStackNavigator();
 const WalletStack = createNativeStackNavigator();
 const AIStack = createNativeStackNavigator();
+const VehicleStack = createNativeStackNavigator();
 const ProfileStack = createNativeStackNavigator();
 
 function MapTabStack() {
@@ -74,6 +78,16 @@ function AITabStack() {
       <AIStack.Screen name="RouteResult" component={RouteResultScreen} />
       <AIStack.Screen name="CostReport" component={CostReportScreen} />
     </AIStack.Navigator>
+  );
+}
+
+function VehicleTabStack() {
+  return (
+    <VehicleStack.Navigator screenOptions={{ headerShown: false }}>
+      <VehicleStack.Screen name="VehicleDashboard" component={VehicleDashboardScreen} />
+      <VehicleStack.Screen name="VehicleList" component={VehicleScreen} />
+      <VehicleStack.Screen name="AddVehicle" component={AddVehicleScreen} />
+    </VehicleStack.Navigator>
   );
 }
 
@@ -192,6 +206,7 @@ function InlineTabs({ state, descriptors, navigation }: any) {
     { name: 'BookingsTab', icon: '\u{1F4CB}', label: 'Bookings' },
     { name: 'AITab', icon: '\u{1F916}', label: 'AI' },
     { name: 'WalletTab', icon: '\u{1F4B3}', label: 'Wallet' },
+    { name: 'VehicleTab', icon: '\u{1F697}', label: 'Vehicle' },
     { name: 'ProfileTab', icon: '\u{1F464}', label: 'Profile' },
   ];
 
@@ -251,6 +266,7 @@ export function DriverNavigator() {
       <Tab.Screen name="BookingsTab" component={BookingsTabStack} />
       <Tab.Screen name="AITab" component={AITabStack} />
       <Tab.Screen name="WalletTab" component={WalletTabStack} />
+      <Tab.Screen name="VehicleTab" component={VehicleTabStack} />
       <Tab.Screen name="ProfileTab" component={ProfileTabStack} />
     </Tab.Navigator>
   );
