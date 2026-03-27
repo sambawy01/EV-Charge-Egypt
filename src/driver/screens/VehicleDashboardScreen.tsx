@@ -784,22 +784,22 @@ export function VehicleDashboardScreen({ navigation }: any) {
                 <View>
                   <Text style={{ fontSize: 28, marginBottom: 10 }}>{insight.icon}</Text>
                   <Text style={{
-                    ...typography.bodyBold,
+                    ...typography.h3,
                     color: outlineColor,
                     marginBottom: 6,
-                    fontSize: 14,
+                    fontSize: 16,
                   }}>
                     {insight.title}
                   </Text>
                 </View>
                 <Text
                   style={{
-                    ...typography.caption,
-                    color: colors.textSecondary,
-                    lineHeight: 18,
-                    fontSize: 11,
+                    ...typography.body,
+                    color: 'rgba(255,255,255,0.85)',
+                    lineHeight: 22,
+                    fontSize: 14,
                   }}
-                  numberOfLines={4}
+                  numberOfLines={5}
                 >
                   {insight.description}
                 </Text>
