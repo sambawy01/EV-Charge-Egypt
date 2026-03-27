@@ -91,27 +91,27 @@ function InlineTabs({ state, descriptors, navigation }: any) {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: colors.surface,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
-      gap: 2,
+      gap: 6,
     }}>
       {/* Brand */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
-        <Text style={{ fontSize: 20 }}>{'\u26A1'}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
+        <Text style={{ fontSize: 26 }}>{'\u26A1'}</Text>
         <Text style={{
           fontFamily: 'SpaceGrotesk-Bold',
-          fontSize: 15,
+          fontSize: 18,
           color: colors.primary,
-          marginLeft: 6,
+          marginLeft: 8,
         }}>EV Fleet</Text>
       </View>
 
       {/* Spacer */}
       <View style={{ flex: 1 }} />
 
-      {/* Nav tabs */}
+      {/* Nav tabs — 3D boxes with cyan glow */}
       {tabs.map((tab) => {
         const routeIndex = state.routes.findIndex((r: any) => r.name === tab.name);
         const isFocused = state.index === routeIndex;
@@ -121,20 +121,32 @@ function InlineTabs({ state, descriptors, navigation }: any) {
             onPress={() => {
               if (!isFocused) navigation.navigate(tab.name);
             }}
+            activeOpacity={0.8}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              paddingHorizontal: 12,
-              paddingVertical: 8,
-              borderRadius: 8,
-              backgroundColor: isFocused ? colors.primaryLight : 'transparent',
-              gap: 5,
+              paddingHorizontal: 18,
+              paddingVertical: 12,
+              borderRadius: 12,
+              gap: 8,
+              backgroundColor: isFocused ? colors.surfaceTertiary : colors.surfaceSecondary,
+              borderWidth: isFocused ? 1.5 : 1,
+              borderColor: isFocused ? colors.primary : colors.border,
+              borderTopColor: isFocused ? colors.primary : colors.surfaceTertiary,
+              borderBottomColor: isFocused ? colors.primaryDark : colors.background,
+              borderBottomWidth: isFocused ? 3 : 2,
+              shadowColor: isFocused ? colors.primary : 'transparent',
+              shadowOffset: { width: 0, height: isFocused ? 0 : 2 },
+              shadowOpacity: isFocused ? 0.5 : 0,
+              shadowRadius: isFocused ? 12 : 0,
+              elevation: isFocused ? 8 : 2,
             }}
           >
-            <Text style={{ fontSize: 14 }}>{tab.icon}</Text>
+            <Text style={{ fontSize: 18 }}>{tab.icon}</Text>
             <Text style={{
-              fontSize: 12,
-              color: isFocused ? colors.primary : colors.textTertiary,
+              fontFamily: isFocused ? 'SpaceGrotesk-SemiBold' : undefined,
+              fontSize: 14,
+              color: isFocused ? colors.primary : colors.textSecondary,
               fontWeight: isFocused ? '600' : '400',
             }}>
               {tab.label}
