@@ -35,7 +35,7 @@ export function ProximityReporter({ stations, userLocation }: Props) {
     for (const station of stations) {
       if (dismissedStations.has(station.id)) continue;
       const dist = haversineM(userLocation.latitude, userLocation.longitude, station.latitude, station.longitude);
-      if (dist < 200) {
+      if (dist < 20) {
         setNearbyStation(station);
         setShowPopup(true);
         setSubmitted(false);

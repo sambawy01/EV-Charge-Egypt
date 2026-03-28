@@ -276,7 +276,7 @@ export function MapScreen({ navigation }: any) {
                         <Text style={{ fontSize: 9, color: liveColor, fontWeight: '600' }}>
                           {live.status === 'available' ? 'Available' : live.status === 'partially_available' ? 'Some free' : live.status === 'busy' ? 'Busy' : 'Out of service'}
                         </Text>
-                        <Text style={{ fontSize: 8, color: colors.textTertiary }}>{'\u00B7'} {live.timeAgo}</Text>
+                        <Text style={{ fontSize: 8, color: colors.textTertiary }}>{'\u00B7'} {live.timeAgo} {'\u00B7'} {live.lastReportTime}</Text>
                       </View>
                     );
                   })()}
@@ -465,7 +465,7 @@ export function MapScreen({ navigation }: any) {
                           <Text style={{ fontSize: 9, color: liveColor, fontWeight: '600' }}>
                             {live.status === 'available' ? 'Available' : live.status === 'partially_available' ? 'Some free' : live.status === 'busy' ? 'Busy' : 'Out of service'}
                           </Text>
-                          <Text style={{ fontSize: 8, color: colors.textTertiary }}>{'\u00B7'} {live.timeAgo}</Text>
+                          <Text style={{ fontSize: 8, color: colors.textTertiary }}>{'\u00B7'} {live.timeAgo} {'\u00B7'} {live.lastReportTime}</Text>
                         </View>
                       );
                     })()}

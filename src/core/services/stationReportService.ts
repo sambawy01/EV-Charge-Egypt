@@ -18,6 +18,7 @@ export interface StationLiveStatus {
   availableSpots: number | null;
   totalSpots: number | null;
   lastReport: string; // ISO date
+  lastReportTime: string; // formatted: "3:45 PM"
   reportCount: number; // reports in last 24h
   timeAgo: string; // "5 min ago", "2 hours ago"
   confidence: 'high' | 'medium' | 'low'; // based on recency
@@ -51,11 +52,14 @@ function buildLiveStatus(reports: StationReport[]): StationLiveStatus {
   const last24h = reports.filter(
     (r) => Date.now() - new Date(r.created_at).getTime() < 24 * 60 * 60 * 1000,
   );
+  const reportDate = new Date(latest.created_at);
+  const timeStr = reportDate.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   return {
     status: latest.status,
     availableSpots: latest.available_spots,
     totalSpots: latest.total_spots,
     lastReport: latest.created_at,
+    lastReportTime: timeStr,
     reportCount: last24h.length,
     timeAgo: getTimeAgo(latest.created_at),
     confidence: getConfidence(latest.created_at),
