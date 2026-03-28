@@ -123,6 +123,30 @@ export function MapScreen({ navigation }: any) {
   const { data: stations, isLoading } = useStations(filters, userLocation);
   const { data: vehicles } = useVehicles();
 
+  // Listen for messages from the map iframe (station clicks + status reports)
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type === 'stationClick' && data.stationId) {
+        navigation.navigate('StationDetail', { stationId: data.stationId });
+      }
+      if (data.type === 'statusReport' && data.stationId && data.status) {
+        stationReportService.submitReport({
+          stationId: data.stationId,
+          status: data.status,
+        }).then((ok) => {
+          if (ok) {
+            Alert.alert('Thanks! ⚡', 'Station status updated.');
+            stationReportService.getAllLiveStatuses().then(setLiveStatuses);
+          }
+        });
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [navigation]);
+
   const handleStationPress = useCallback(
     (station: Station) => {
       navigation.navigate('StationDetail', { stationId: station.id });

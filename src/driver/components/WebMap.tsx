@@ -155,16 +155,33 @@ function createMarkerIcon(color,isHighlighted){
 
 function createInfoContent(s){
   var navUrl='https://www.google.com/maps/dir/?api=1&destination='+s.latitude+','+s.longitude+'&travelmode=driving';
-  return '<div style="background:#141B2D;color:#F0F4FF;padding:12px;border-radius:10px;min-width:240px;font-family:system-ui,-apple-system,sans-serif;">' +
-    '<div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#F0F4FF;">' + s.name + '</div>' +
-    '<div style="font-size:12px;color:#8892B0;margin-bottom:2px;">' + s.provider + '</div>' +
-    (s.address ? '<div style="font-size:11px;color:#5A6482;margin-bottom:4px;">' + s.address + '</div>' : '') +
+  return '<div style="background:#141B2D;color:#F0F4FF;padding:14px;border-radius:12px;min-width:280px;max-width:320px;font-family:system-ui,-apple-system,sans-serif;">' +
+    // Clickable station name — posts message to parent for navigation
+    '<div onclick="window.parent.postMessage({type:\\'stationClick\\',stationId:\\''+s.id+'\\'},\\'*\\')" style="cursor:pointer;">' +
+      '<div style="font-weight:700;font-size:15px;margin-bottom:4px;color:#F0F4FF;">' + s.name + ' <span style="font-size:11px;color:#00D4FF;">→</span></div>' +
+      '<div style="font-size:12px;color:#8892B0;margin-bottom:2px;">' + s.provider + '</div>' +
+      (s.address ? '<div style="font-size:11px;color:#5A6482;margin-bottom:4px;">' + s.address + '</div>' : '') +
+    '</div>' +
     (s.connectors ? '<div style="font-size:11px;color:#F0F4FF;margin-bottom:4px;">' + s.connectors + '</div>' : '') +
     (s.distance ? '<div style="font-size:11px;color:#00D4FF;font-weight:600;margin-bottom:6px;">' + s.distance + ' away</div>' : '') +
-    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">' +
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
       '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#FFFFFF;background:' + s.color + ';">' + s.status + '</span>' +
     '</div>' +
-    '<a href="' + navUrl + '" target="_blank" style="display:block;text-align:center;margin-top:8px;padding:8px 12px;background:linear-gradient(135deg,#00D4FF,#8B5CF6,#D946EF);color:#FFFFFF;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600;">📍 Navigate</a>' +
+    // Status report buttons
+    '<div style="margin-bottom:10px;">' +
+      '<div style="font-size:10px;color:#8892B0;margin-bottom:6px;text-transform:uppercase;letter-spacing:1px;">Update Status:</div>' +
+      '<div style="display:flex;gap:6px;">' +
+        '<button onclick="window.parent.postMessage({type:\\'statusReport\\',stationId:\\''+s.id+'\\',status:\\'available\\'},\\'*\\')" style="flex:1;padding:6px 0;border-radius:8px;border:1px solid #00FF88;background:#00FF8815;color:#00FF88;font-size:10px;font-weight:700;cursor:pointer;">✅ Open</button>' +
+        '<button onclick="window.parent.postMessage({type:\\'statusReport\\',stationId:\\''+s.id+'\\',status:\\'partially_available\\'},\\'*\\')" style="flex:1;padding:6px 0;border-radius:8px;border:1px solid #FFB020;background:#FFB02015;color:#FFB020;font-size:10px;font-weight:700;cursor:pointer;">🟡 Some</button>' +
+        '<button onclick="window.parent.postMessage({type:\\'statusReport\\',stationId:\\''+s.id+'\\',status:\\'busy\\'},\\'*\\')" style="flex:1;padding:6px 0;border-radius:8px;border:1px solid #FF4D6A;background:#FF4D6A15;color:#FF4D6A;font-size:10px;font-weight:700;cursor:pointer;">🔴 Busy</button>' +
+        '<button onclick="window.parent.postMessage({type:\\'statusReport\\',stationId:\\''+s.id+'\\',status:\\'out_of_service\\'},\\'*\\')" style="flex:1;padding:6px 0;border-radius:8px;border:1px solid #FF4D6A;background:#FF4D6A15;color:#FF4D6A;font-size:10px;font-weight:700;cursor:pointer;">⚠️</button>' +
+      '</div>' +
+    '</div>' +
+    // Action buttons row
+    '<div style="display:flex;gap:8px;">' +
+      '<div onclick="window.parent.postMessage({type:\\'stationClick\\',stationId:\\''+s.id+'\\'},\\'*\\')" style="flex:1;text-align:center;padding:10px;background:#1C2438;border:1px solid #2A3350;color:#00D4FF;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">ℹ️ Details</div>' +
+      '<a href="' + navUrl + '" target="_blank" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#00D4FF,#8B5CF6,#D946EF);color:#FFFFFF;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;">📍 Navigate</a>' +
+    '</div>' +
     '</div>';
 }
 
