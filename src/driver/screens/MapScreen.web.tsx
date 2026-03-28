@@ -7,17 +7,20 @@ import {
   TouchableOpacity,
   StyleSheet,
   useWindowDimensions,
+  Alert,
 } from 'react-native';
 import { useStations } from '@/core/queries/useStations';
 import { useMapStore } from '@/core/stores/mapStore';
 import { WebMap } from '../components/WebMap';
 import { FilterModal } from '../components/FilterModal';
+import { ProximityReporter } from '../components/ProximityReporter';
 import { LoadingScreen } from '@/core/components';
 import { colors } from '@/core/theme/colors';
 import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 import type { Station } from '@/core/types/station';
 import { aiContextService } from '@/core/services/aiContextService';
+import { stationReportService } from '@/core/services/stationReportService';
 import { useVehicles } from '@/core/queries/useVehicles';
 
 // ---------------------------------------------------------------------------
@@ -159,6 +162,13 @@ export function MapScreen({ navigation }: any) {
     return map;
   }, [aiContext, displayStations]);
 
+  // Live community statuses
+  const [liveStatuses, setLiveStatuses] = useState<Map<string, any>>(new Map());
+
+  useEffect(() => {
+    stationReportService.getAllLiveStatuses().then(setLiveStatuses);
+  }, []);
+
   const { width: screenWidth } = useWindowDimensions();
   const isMobile = screenWidth < 768;
 
@@ -254,16 +264,63 @@ export function MapScreen({ navigation }: any) {
                       </Text>
                     </View>
                   )}
-                  {station.distance_km != null && (
-                    <Text style={{ ...typography.mono, color: colors.primary, marginTop: 4, fontSize: 12 }}>
-                      {station.distance_km < 1 ? `${Math.round(station.distance_km * 1000)}m` : `${station.distance_km.toFixed(1)} km`}
-                    </Text>
-                  )}
+                  {(() => {
+                    const live = liveStatuses.get(station.id);
+                    if (!live) return null;
+                    const liveColor = live.status === 'available' ? colors.statusAvailable :
+                      live.status === 'partially_available' ? colors.statusPartial :
+                      live.status === 'busy' ? colors.statusOccupied : colors.error;
+                    return (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                        <Text style={{ fontSize: 8 }}>{'\uD83D\uDCE1'}</Text>
+                        <Text style={{ fontSize: 9, color: liveColor, fontWeight: '600' }}>
+                          {live.status === 'available' ? 'Available' : live.status === 'partially_available' ? 'Some free' : live.status === 'busy' ? 'Busy' : 'Out of service'}
+                        </Text>
+                        <Text style={{ fontSize: 8, color: colors.textTertiary }}>{'\u00B7'} {live.timeAgo}</Text>
+                      </View>
+                    );
+                  })()}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                    {station.distance_km != null ? (
+                      <Text style={{ ...typography.mono, color: colors.primary, fontSize: 12 }}>
+                        {station.distance_km < 1 ? `${Math.round(station.distance_km * 1000)}m` : `${station.distance_km.toFixed(1)} km`}
+                      </Text>
+                    ) : <View />}
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        Alert.alert(
+                          `Report: ${station.name}`,
+                          'What\'s the current status?',
+                          [
+                            { text: '\u2705 Available', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'available' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                            { text: '\uD83D\uDFE1 Some Free', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'partially_available' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                            { text: '\uD83D\uDD34 All Busy', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'busy' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                            { text: '\u26A0\uFE0F Broken', style: 'destructive', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'out_of_service' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                            { text: 'Cancel', style: 'cancel' },
+                          ]
+                        );
+                      }}
+                      style={{
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 6,
+                        backgroundColor: colors.secondary + '15',
+                        borderWidth: 1,
+                        borderColor: colors.secondary,
+                      }}
+                    >
+                      <Text style={{ fontSize: 10, fontWeight: '600', color: colors.secondary }}>{'\uD83D\uDCE1'} Report</Text>
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         </View>
+
+        {/* Proximity detection popup */}
+        <ProximityReporter stations={displayStations} userLocation={userLocation} />
 
         {/* Filter modal */}
         <FilterModal
@@ -397,6 +454,22 @@ export function MapScreen({ navigation }: any) {
                       </View>
                     )}
                     {(() => {
+                      const live = liveStatuses.get(station.id);
+                      if (!live) return null;
+                      const liveColor = live.status === 'available' ? colors.statusAvailable :
+                        live.status === 'partially_available' ? colors.statusPartial :
+                        live.status === 'busy' ? colors.statusOccupied : colors.error;
+                      return (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
+                          <Text style={{ fontSize: 8 }}>{'\uD83D\uDCE1'}</Text>
+                          <Text style={{ fontSize: 9, color: liveColor, fontWeight: '600' }}>
+                            {live.status === 'available' ? 'Available' : live.status === 'partially_available' ? 'Some free' : live.status === 'busy' ? 'Busy' : 'Out of service'}
+                          </Text>
+                          <Text style={{ fontSize: 8, color: colors.textTertiary }}>{'\u00B7'} {live.timeAgo}</Text>
+                        </View>
+                      );
+                    })()}
+                    {(() => {
                       const rec = recommendations.get(station.id);
                       if (!rec || rec.score < 60) return null;
                       return (
@@ -444,7 +517,33 @@ export function MapScreen({ navigation }: any) {
                         borderColor: colors.primary,
                       }}
                     >
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primary }}>📍 Navigate</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primary }}>{'\uD83D\uDCCD'} Navigate</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        Alert.alert(
+                          `Report: ${station.name}`,
+                          'What\'s the current status?',
+                          [
+                            { text: '\u2705 Available', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'available' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                            { text: '\uD83D\uDFE1 Some Free', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'partially_available' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                            { text: '\uD83D\uDD34 All Busy', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'busy' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                            { text: '\u26A0\uFE0F Broken', style: 'destructive', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'out_of_service' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                            { text: 'Cancel', style: 'cancel' },
+                          ]
+                        );
+                      }}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 6,
+                        backgroundColor: colors.secondary + '15',
+                        borderWidth: 1,
+                        borderColor: colors.secondary,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.secondary }}>{'\uD83D\uDCE1'} Report</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
@@ -463,6 +562,8 @@ export function MapScreen({ navigation }: any) {
           onStationPress={handleStationPress}
           userLocation={userLocation}
         />
+        {/* Proximity detection popup */}
+        <ProximityReporter stations={displayStations} userLocation={userLocation} />
       </View>
 
       {/* Filter modal */}
