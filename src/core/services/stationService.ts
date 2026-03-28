@@ -280,7 +280,7 @@ export const stationService = {
   },
 
   computeStatus(connectors: Connector[]): StationStatus {
-    if (!connectors.length) return 'offline';
+    if (!connectors.length) return 'available'; // Default to available — crowdsourced reports will override
     const available = connectors.filter((c) => c.status === 'available').length;
     const offline = connectors.filter((c) => c.status === 'offline').length;
     if (offline === connectors.length) return 'offline';
