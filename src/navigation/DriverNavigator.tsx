@@ -263,7 +263,7 @@ function InlineTabs({ state, descriptors, navigation }: any) {
           return (
             <TouchableOpacity
               key={tab.name}
-              onPress={() => { if (!isFocused) navigation.navigate(tab.name); }}
+              onPress={() => { if (isFocused) { navigation.navigate(tab.name, { screen: tab.name === 'MapTab' ? 'Map' : undefined }); } else { navigation.navigate(tab.name); } }}
               style={{
                 flex: 1,
                 alignItems: 'center',
@@ -342,7 +342,7 @@ function InlineTabs({ state, descriptors, navigation }: any) {
               isFocused={isFocused}
               colors={colors}
               onPress={() => {
-                if (!isFocused) navigation.navigate(tab.name);
+                if (isFocused) { navigation.navigate(tab.name, { screen: tab.name === 'MapTab' ? 'Map' : undefined }); } else { navigation.navigate(tab.name); }
               }}
             />
             {tab.name === 'AITab' && aiNotifCount > 0 && !isFocused && (

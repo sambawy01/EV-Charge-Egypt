@@ -24,8 +24,8 @@ export function Header({ title, onBack, rightAction }: HeaderProps) {
       ]}
     >
       {onBack ? (
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={[styles.backText, { color: colors.primary }]}>{'<'}</Text>
+        <TouchableOpacity onPress={onBack} style={[styles.backButton, { backgroundColor: colors.surfaceSecondary, borderRadius: 10, borderWidth: 1, borderColor: colors.border }]}>
+          <Text style={[styles.backText, { color: colors.primary }]}>{'\u2190'}</Text>
         </TouchableOpacity>
       ) : (
         <View style={styles.placeholder} />
