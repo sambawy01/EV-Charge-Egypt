@@ -8,9 +8,10 @@ interface StationRatingProps {
   stationName: string;
   currentRating?: number;
   reviewCount?: number;
+  isNearby?: boolean;
 }
 
-export function StationRating({ stationId, stationName, currentRating = 0, reviewCount = 0 }: StationRatingProps) {
+export function StationRating({ stationId, stationName, currentRating = 0, reviewCount = 0, isNearby = false }: StationRatingProps) {
   const [userRating, setUserRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -90,16 +91,28 @@ export function StationRating({ stationId, stationName, currentRating = 0, revie
           </Text>
         </View>
       ) : !showForm ? (
-        <TouchableOpacity
-          onPress={() => setShowForm(true)}
-          style={{
+        isNearby ? (
+          <TouchableOpacity
+            onPress={() => setShowForm(true)}
+            style={{
+              backgroundColor: colors.surfaceSecondary,
+              borderWidth: 1, borderColor: colors.border,
+              borderRadius: 10, paddingVertical: 10, alignItems: 'center',
+            }}
+          >
+            <Text style={{ ...typography.caption, color: colors.primary }}>⭐ Rate & Review This Station</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{
             backgroundColor: colors.surfaceSecondary,
             borderWidth: 1, borderColor: colors.border,
             borderRadius: 10, paddingVertical: 10, alignItems: 'center',
-          }}
-        >
-          <Text style={{ ...typography.caption, color: colors.primary }}>Rate & Review This Station</Text>
-        </TouchableOpacity>
+            flexDirection: 'row', justifyContent: 'center', gap: 6,
+          }}>
+            <Text style={{ fontSize: 12 }}>📍</Text>
+            <Text style={{ ...typography.caption, color: colors.textTertiary }}>Visit this station to leave a review</Text>
+          </View>
+        )
       ) : (
         <View style={{
           backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,

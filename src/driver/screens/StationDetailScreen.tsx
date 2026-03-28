@@ -285,6 +285,7 @@ export function StationDetailScreen({ route, navigation }: any) {
             stationName={station.name}
             currentRating={station.rating_avg}
             reviewCount={station.review_count}
+            isNearby={isNearby}
           />
         </Card>
 
