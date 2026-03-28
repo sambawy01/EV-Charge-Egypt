@@ -85,6 +85,7 @@ function buildMapHtml(
       connectors: (s.connectors || [])
         .map((c) => c.type + ' ' + c.power_kw + 'kW')
         .join(', '),
+      verified: (s as any).is_verified || false,
     }))
   );
 
@@ -158,7 +159,7 @@ function createInfoContent(s){
   return '<div style="background:#141B2D;color:#F0F4FF;padding:14px;border-radius:12px;min-width:280px;max-width:320px;font-family:system-ui,-apple-system,sans-serif;">' +
     // Clickable station name — posts message to parent for navigation
     '<div onclick="window.parent.postMessage({type:\\'stationClick\\',stationId:\\''+s.id+'\\'},\\'*\\')" style="cursor:pointer;">' +
-      '<div style="font-weight:700;font-size:15px;margin-bottom:4px;color:#F0F4FF;">' + s.name + ' <span style="font-size:11px;color:#00D4FF;">→</span></div>' +
+      '<div style="font-weight:700;font-size:15px;margin-bottom:4px;color:#F0F4FF;">' + s.name + (s.verified ? ' <span style="color:#00D4FF;font-size:12px;">\u2713 Verified</span>' : '') + ' <span style="font-size:11px;color:#00D4FF;">\u2192</span></div>' +
       '<div style="font-size:12px;color:#8892B0;margin-bottom:2px;">' + s.provider + '</div>' +
       (s.address ? '<div style="font-size:11px;color:#5A6482;margin-bottom:4px;">' + s.address + '</div>' : '') +
     '</div>' +

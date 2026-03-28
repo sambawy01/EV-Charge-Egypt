@@ -249,9 +249,22 @@ export function MapScreen({ navigation }: any) {
           maxHeight: 200,
         }}>
           <View style={{ width: 40, height: 4, backgroundColor: colors.border, borderRadius: 2, alignSelf: 'center', marginBottom: 12 }} />
-          <Text style={{ ...typography.caption, color: colors.textTertiary, marginBottom: 8 }}>
-            {displayStations.length} stations nearby
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+              {displayStations.length} stations nearby
+            </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SubmitStation')}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                backgroundColor: colors.secondary + '15', borderWidth: 1, borderColor: colors.secondary,
+                borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+              }}
+            >
+              <Text style={{ fontSize: 10 }}>{'\u2795'}</Text>
+              <Text style={{ fontSize: 10, fontWeight: '600', color: colors.secondary }}>Add Station</Text>
+            </TouchableOpacity>
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {displayStations.slice(0, 5).map((station) => {
               const statusColor = getStatusColor(station);
@@ -278,7 +291,12 @@ export function MapScreen({ navigation }: any) {
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusColor }} />
                     <Text style={{ fontSize: 10, fontWeight: '600', color: statusColor }}>{statusLabel}</Text>
                   </View>
-                  <Text style={{ ...typography.bodyBold, color: colors.text, fontSize: 13 }} numberOfLines={1}>{station.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={{ ...typography.bodyBold, color: colors.text, fontSize: 13, flex: 1 }} numberOfLines={1}>{station.name}</Text>
+                    {(station as any).is_verified && (
+                      <Text style={{ fontSize: 11, color: '#00D4FF', fontWeight: '700' }}>{'\u2713'}</Text>
+                    )}
+                  </View>
                   <Text style={{ ...typography.caption, color: colors.textSecondary, marginTop: 2 }} numberOfLines={1}>{station.address || station.city}</Text>
                   {station.rating_avg > 0 && (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
@@ -419,6 +437,19 @@ export function MapScreen({ navigation }: any) {
           <Text style={styles.countText}>{panelTitle}</Text>
         </View>
 
+        {/* Submit Station button */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('SubmitStation')}
+          style={{
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+            backgroundColor: colors.secondary + '15', borderWidth: 1, borderColor: colors.secondary,
+            borderRadius: 10, paddingVertical: 8, marginHorizontal: 16, marginBottom: 8, marginTop: 4,
+          }}
+        >
+          <Text style={{ fontSize: 14 }}>{'\u2795'}</Text>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: colors.secondary }}>Submit New Station</Text>
+        </TouchableOpacity>
+
         {/* Station list */}
         <ScrollView style={styles.stationList} showsVerticalScrollIndicator={false}>
           {filteredStations.length === 0 ? (
@@ -448,9 +479,14 @@ export function MapScreen({ navigation }: any) {
 
                   {/* Info */}
                   <View style={styles.stationInfo}>
-                    <Text style={styles.stationName} numberOfLines={1}>
-                      {station.name}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={styles.stationName} numberOfLines={1}>
+                        {station.name}
+                      </Text>
+                      {(station as any).is_verified && (
+                        <Text style={{ fontSize: 11, color: '#00D4FF', fontWeight: '700' }}>{'\u2713'}</Text>
+                      )}
+                    </View>
                     <Text style={styles.stationAddress} numberOfLines={1}>
                       {station.address || station.city || station.area || ''}
                     </Text>

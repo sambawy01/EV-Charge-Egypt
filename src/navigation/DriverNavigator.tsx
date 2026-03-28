@@ -32,6 +32,9 @@ import { TripPlannerScreen } from '@/driver/screens/TripPlannerScreen';
 // Plan 9: News Feed
 import { NewsScreen } from '@/driver/screens/NewsScreen';
 
+// Plan 10: Submit Station (crowdsourced)
+import { SubmitStationScreen } from '@/driver/screens/SubmitStationScreen';
+
 // Plan 6: Driver Profile screens
 import { ProfileScreen } from '@/driver/screens/ProfileScreen';
 import { VehicleScreen } from '@/driver/screens/VehicleScreen';
@@ -56,6 +59,7 @@ function MapTabStack() {
       <MapStack.Screen name="Booking" component={BookingScreen} />
       <MapStack.Screen name="ChargingSession" component={ChargingSessionScreen} />
       <MapStack.Screen name="BookingDetail" component={BookingDetailScreen} />
+      <MapStack.Screen name="SubmitStation" component={SubmitStationScreen} />
     </MapStack.Navigator>
   );
 }
