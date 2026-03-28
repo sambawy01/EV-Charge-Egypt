@@ -32,6 +32,31 @@ export function StationDetailScreen({ route, navigation }: any) {
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
   const [spots, setSpots] = useState('');
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [isNearby, setIsNearby] = useState(false);
+
+  // Get user location
+  useEffect(() => {
+    if (navigator?.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setUserLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+        () => {},
+        { enableHighAccuracy: true }
+      );
+    }
+  }, []);
+
+  // Check if user is within 100m of station
+  useEffect(() => {
+    if (userLocation && station) {
+      const R = 6371000;
+      const dLat = (station.latitude - userLocation.latitude) * Math.PI / 180;
+      const dLon = (station.longitude - userLocation.longitude) * Math.PI / 180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(userLocation.latitude*Math.PI/180) * Math.cos(station.latitude*Math.PI/180) * Math.sin(dLon/2)**2;
+      const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      setIsNearby(dist < 100);
+    }
+  }, [userLocation, station]);
 
   useEffect(() => {
     if (station?.id) {
@@ -129,8 +154,19 @@ export function StationDetailScreen({ route, navigation }: any) {
             </View>
           )}
 
-          {/* ===== INLINE STATUS BUTTONS — ALWAYS VISIBLE ===== */}
-          {reportSubmitted ? (
+          {/* ===== INLINE STATUS BUTTONS — ONLY WHEN NEARBY ===== */}
+          {!isNearby ? (
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+              backgroundColor: colors.surfaceSecondary, padding: 12, borderRadius: 10,
+              borderWidth: 1, borderColor: colors.border,
+            }}>
+              <Text style={{ fontSize: 14 }}>📍</Text>
+              <Text style={{ ...typography.caption, color: colors.textTertiary }}>
+                Visit this station to update its status
+              </Text>
+            </View>
+          ) : reportSubmitted ? (
             <View style={{
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
               backgroundColor: colors.secondary + '15', padding: 12, borderRadius: 10,
