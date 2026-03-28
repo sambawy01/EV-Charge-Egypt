@@ -286,32 +286,34 @@ export function MapScreen({ navigation }: any) {
                         {station.distance_km < 1 ? `${Math.round(station.distance_km * 1000)}m` : `${station.distance_km.toFixed(1)} km`}
                       </Text>
                     ) : <View />}
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        Alert.alert(
-                          `Report: ${station.name}`,
-                          'What\'s the current status?',
-                          [
-                            { text: '\u2705 Available', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'available' }).then(() => Alert.alert('Thanks! \u26A1')) },
-                            { text: '\uD83D\uDFE1 Some Free', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'partially_available' }).then(() => Alert.alert('Thanks! \u26A1')) },
-                            { text: '\uD83D\uDD34 All Busy', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'busy' }).then(() => Alert.alert('Thanks! \u26A1')) },
-                            { text: '\u26A0\uFE0F Broken', style: 'destructive', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'out_of_service' }).then(() => Alert.alert('Thanks! \u26A1')) },
-                            { text: 'Cancel', style: 'cancel' },
-                          ]
-                        );
-                      }}
-                      style={{
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 6,
-                        backgroundColor: colors.secondary + '15',
-                        borderWidth: 1,
-                        borderColor: colors.secondary,
-                      }}
-                    >
-                      <Text style={{ fontSize: 10, fontWeight: '600', color: colors.secondary }}>{'\uD83D\uDCE1'} Report</Text>
-                    </TouchableOpacity>
+                    {station.distance_km != null && station.distance_km <= 0.1 ? (
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          Alert.alert(
+                            `Report: ${station.name}`,
+                            'What\'s the current status?',
+                            [
+                              { text: '\u2705 Available', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'available' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                              { text: '\uD83D\uDFE1 Some Free', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'partially_available' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                              { text: '\uD83D\uDD34 All Busy', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'busy' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                              { text: '\u26A0\uFE0F Broken', style: 'destructive', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'out_of_service' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                              { text: 'Cancel', style: 'cancel' },
+                            ]
+                          );
+                        }}
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 6,
+                          backgroundColor: colors.secondary + '15',
+                          borderWidth: 1,
+                          borderColor: colors.secondary,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: colors.secondary }}>{'\uD83D\uDCE1'} Report</Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 </TouchableOpacity>
               );
@@ -519,32 +521,34 @@ export function MapScreen({ navigation }: any) {
                     >
                       <Text style={{ fontSize: 11, fontWeight: '600', color: colors.primary }}>{'\uD83D\uDCCD'} Navigate</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        Alert.alert(
-                          `Report: ${station.name}`,
-                          'What\'s the current status?',
-                          [
-                            { text: '\u2705 Available', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'available' }).then(() => Alert.alert('Thanks! \u26A1')) },
-                            { text: '\uD83D\uDFE1 Some Free', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'partially_available' }).then(() => Alert.alert('Thanks! \u26A1')) },
-                            { text: '\uD83D\uDD34 All Busy', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'busy' }).then(() => Alert.alert('Thanks! \u26A1')) },
-                            { text: '\u26A0\uFE0F Broken', style: 'destructive', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'out_of_service' }).then(() => Alert.alert('Thanks! \u26A1')) },
-                            { text: 'Cancel', style: 'cancel' },
-                          ]
-                        );
-                      }}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 6,
-                        backgroundColor: colors.secondary + '15',
-                        borderWidth: 1,
-                        borderColor: colors.secondary,
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.secondary }}>{'\uD83D\uDCE1'} Report</Text>
-                    </TouchableOpacity>
+                    {station.distance_km != null && station.distance_km <= 0.1 && (
+                      <TouchableOpacity
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          Alert.alert(
+                            `Report: ${station.name}`,
+                            'What\'s the current status?',
+                            [
+                              { text: '\u2705 Available', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'available' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                              { text: '\uD83D\uDFE1 Some Free', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'partially_available' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                              { text: '\uD83D\uDD34 All Busy', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'busy' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                              { text: '\u26A0\uFE0F Broken', style: 'destructive', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'out_of_service' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                              { text: 'Cancel', style: 'cancel' },
+                            ]
+                          );
+                        }}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 5,
+                          borderRadius: 6,
+                          backgroundColor: colors.secondary + '15',
+                          borderWidth: 1,
+                          borderColor: colors.secondary,
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: colors.secondary }}>{'\uD83D\uDCE1'} Report</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </TouchableOpacity>
               );
