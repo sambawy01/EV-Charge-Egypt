@@ -205,6 +205,11 @@ function initMap(){
 
   var openInfoWindow=null;
 
+  // Close info window when clicking anywhere on the map
+  map.addListener('click', function() {
+    if (openInfoWindow) { openInfoWindow.close(); openInfoWindow = null; }
+  });
+
   // User location marker
   if(userLoc){
     new google.maps.Marker({
