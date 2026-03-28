@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Alert } from 'react-native';
-import { colors } from '@/core/theme/colors';
+import { useTheme } from '@/core/theme';
 import { typography } from '@/core/theme/typography';
+import { visitTracker } from '@/core/services/visitTracker';
 
 interface StationRatingProps {
   stationId: string;
@@ -12,10 +13,19 @@ interface StationRatingProps {
 }
 
 export function StationRating({ stationId, stationName, currentRating = 0, reviewCount = 0, isNearby = false }: StationRatingProps) {
+  const { colors } = useTheme();
   const [userRating, setUserRating] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [hasRecentVisit, setHasRecentVisit] = useState(false);
+
+  // Check if user visited this station within 48h
+  useEffect(() => {
+    visitTracker.hasRecentVisit(stationId).then(setHasRecentVisit);
+  }, [stationId]);
+
+  const canRate = isNearby || hasRecentVisit;
 
   const handleSubmit = () => {
     if (userRating === 0) {
@@ -91,7 +101,7 @@ export function StationRating({ stationId, stationName, currentRating = 0, revie
           </Text>
         </View>
       ) : !showForm ? (
-        isNearby ? (
+        canRate ? (
           <TouchableOpacity
             onPress={() => setShowForm(true)}
             style={{
@@ -100,7 +110,9 @@ export function StationRating({ stationId, stationName, currentRating = 0, revie
               borderRadius: 10, paddingVertical: 10, alignItems: 'center',
             }}
           >
-            <Text style={{ ...typography.caption, color: colors.primary }}>⭐ Rate & Review This Station</Text>
+            <Text style={{ ...typography.caption, color: colors.primary }}>
+              {isNearby ? '⭐ Rate & Review This Station' : '⭐ Rate Your Recent Visit (48h window)'}
+            </Text>
           </TouchableOpacity>
         ) : (
           <View style={{
