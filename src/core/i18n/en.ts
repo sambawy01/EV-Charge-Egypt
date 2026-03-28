@@ -1,6 +1,6 @@
 export const en = {
-  app_name: 'EV Charge Egypt',
-  welcome_title: 'EV Charge Egypt',
+  app_name: 'WattsOn',
+  welcome_title: 'WattsOn',
   welcome_subtitle: 'Find, book & charge across all Egyptian EV providers. One app for everything.',
   get_started: 'Get Started',
   sign_in: 'Sign In',

@@ -1,11 +1,12 @@
 {
   "expo": {
-    "name": "EV Charge Egypt",
-    "slug": "ev-charge-egypt",
+    "name": "WattsOn",
+    "slug": "wattson",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "evcharge",
+    "scheme": "wattson",
+    "description": "Egypt's unified EV charging platform. Find, compare & charge across all providers in one app.",
     "userInterfaceStyle": "light",
     "splash": {
       "image": "./assets/splash-icon.png",

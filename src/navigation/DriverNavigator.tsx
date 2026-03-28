@@ -324,7 +324,7 @@ function InlineTabs({ state, descriptors, navigation }: any) {
           fontSize: 18,
           color: colors.primary,
           marginLeft: 8,
-        }}>EV Charge</Text>
+        }}>WattsOn</Text>
       </View>
 
       {/* Spacer */}

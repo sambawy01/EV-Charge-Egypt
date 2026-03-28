@@ -55,7 +55,7 @@ export function AIScheduleReviewScreen({ navigation }: any) {
 
         <View style={styles.actions}>
           <Button
-            title="Approve & Book All"
+            title="Approve Schedule"
             onPress={() => {
               navigation.navigate('ScheduleMain');
             }}

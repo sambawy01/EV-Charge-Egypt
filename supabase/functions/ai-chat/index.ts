@@ -35,7 +35,7 @@ serve(async (req) => {
       .order('created_at', { ascending: false })
       .limit(5);
 
-    const systemPrompt = `You are Charge AI, the intelligent assistant for EV Charge Egypt — Egypt's unified EV charging platform.
+    const systemPrompt = `You are Charge AI, the intelligent assistant for WattsOn — Egypt's unified EV charging platform.
 
 You help drivers with:
 - Finding charging stations (5 providers: IKARUS, Sha7en, Elsewedy Plug, Kilowatt EV, New Energy)

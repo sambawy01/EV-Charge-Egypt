@@ -16,7 +16,7 @@ describe('i18nService', () => {
   });
 
   it('returns English strings by default', () => {
-    expect(t('app_name')).toBe('EV Charge Egypt');
+    expect(t('app_name')).toBe('WattsOn');
   });
 
   it('translates common keys in English', () => {

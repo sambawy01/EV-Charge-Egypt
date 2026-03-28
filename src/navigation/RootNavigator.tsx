@@ -25,7 +25,7 @@ export function RootNavigator() {
   };
 
   if (isLoading) {
-    return <LoadingScreen message="Starting EV Charge Egypt..." />;
+    return <LoadingScreen message="Starting WattsOn..." />;
   }
 
   return (

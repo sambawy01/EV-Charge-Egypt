@@ -63,8 +63,8 @@ export function RouteResultScreen({ navigation }: any) {
               <Text style={styles.detail}>Cost: {formatEGP(stop.estimatedCost)}</Text>
             </View>
             <Button
-              title="Book This Stop"
-              onPress={() => navigation.navigate('Booking', { stationId: stop.stationId })}
+              title="Navigate to Stop"
+              onPress={() => navigation.navigate('StationDetail', { stationId: stop.stationId })}
               variant="outline"
               size="sm"
             />

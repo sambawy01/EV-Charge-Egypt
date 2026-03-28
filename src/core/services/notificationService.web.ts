@@ -18,7 +18,7 @@ export const notificationService = {
   ): Promise<void> {
     // Web: browser notification if permission granted
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification('EV Charge Egypt', { body: `Your booking at ${_stationName} is starting soon.` });
+      new Notification('WattsOn', { body: `Your session at ${_stationName} is starting soon.` });
     }
   },
 

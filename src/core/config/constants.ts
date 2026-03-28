@@ -1,4 +1,4 @@
-export const APP_NAME = 'EV Charge Egypt';
+export const APP_NAME = 'WattsOn';
 export const SERVICE_FEE_EGP = 10;
 export const DEFAULT_MAP_REGION = {
   latitude: 30.0444,

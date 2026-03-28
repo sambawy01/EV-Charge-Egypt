@@ -28,7 +28,7 @@ export const receiptService = {
         .footer { text-align: center; color: #9CA3AF; font-size: 12px; margin-top: 24px; }
       </style></head><body>
         <div class="logo">&#9889;</div>
-        <h1>EV Charge Egypt</h1>
+        <h1>WattsOn</h1>
         <p style="text-align:center;color:#6B7280;">Charging Receipt</p>
         <div class="divider"></div>
         <div class="row"><span>Station</span><span>${data.stationName}</span></div>

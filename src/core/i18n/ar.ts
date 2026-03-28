@@ -1,6 +1,6 @@
 export const ar = {
-  app_name: 'شحن مصر',
-  welcome_title: 'شحن مصر',
+  app_name: 'WattsOn',
+  welcome_title: 'WattsOn',
   welcome_subtitle:
     'اعثر واحجز واشحن عبر جميع مزودي شحن السيارات الكهربائية في مصر. تطبيق واحد لكل شيء.',
   get_started: 'ابدأ الآن',

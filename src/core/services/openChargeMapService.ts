@@ -405,7 +405,6 @@ export async function fetchEgyptStations(
   try {
     const osmStations = await fetchFromOverpass(options);
     results.push(...osmStations);
-    console.log(`[fetchEgyptStations] Overpass returned ${osmStations.length} stations`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     errors.push(`Overpass: ${msg}`);
@@ -416,7 +415,6 @@ export async function fetchEgyptStations(
   try {
     const ocmStations = await fetchFromOCM(options);
     results.push(...ocmStations);
-    console.log(`[fetchEgyptStations] OCM returned ${ocmStations.length} stations`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     // Only log as warning if it's not just "no key"

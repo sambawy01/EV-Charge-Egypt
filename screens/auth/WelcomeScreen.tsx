@@ -117,7 +117,7 @@ export function WelcomeScreen({ navigation }: any) {
         </Animated.View>
 
         {/* App name */}
-        <Text style={[styles.title, { color: colors.primary }]}>EV Charge</Text>
+        <Text style={[styles.title, { color: colors.primary }]}>WattsOn</Text>
         <Text style={[styles.country, { color: colors.secondary }]}>Egypt</Text>
 
         {/* Gradient separator */}

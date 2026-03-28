@@ -7,7 +7,7 @@ const mockNavigation = { navigate: jest.fn() };
 describe('WelcomeScreen', () => {
   it('renders app name', () => {
     const { getByText } = render(<WelcomeScreen navigation={mockNavigation} />);
-    expect(getByText('EV Charge Egypt')).toBeTruthy();
+    expect(getByText('WattsOn')).toBeTruthy();
   });
 
   it('has Get Started button', () => {

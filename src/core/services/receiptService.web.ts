@@ -19,7 +19,7 @@ export const receiptService = {
 <html>
 <head>
   <meta charset="utf-8">
-  <title>EV Charge Egypt Receipt</title>
+  <title>WattsOn Receipt</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; color: #111827; }
     h1 { color: #10B981; }
@@ -28,7 +28,7 @@ export const receiptService = {
   </style>
 </head>
 <body>
-  <h1>EV Charge Egypt</h1>
+  <h1>WattsOn</h1>
   <p>Receipt #${data.bookingId.slice(0, 8)}</p>
   <div class="row"><span>Station</span><span>${data.stationName}</span></div>
   <div class="row"><span>Provider</span><span>${data.providerName}</span></div>

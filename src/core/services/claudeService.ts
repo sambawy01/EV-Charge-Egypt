@@ -62,7 +62,7 @@ ${stationList}
 - Providers: Elsewedy Plug (largest, 30+ stations), Sha7en (10+ stations), IKARUS (5 stations), Infinity EV (20+ stations), Revolta/KarmCharge
 - Charging cost: 2.5-4.5 EGP/kWh, off-peak (10PM-6AM) is cheapest
 - Common connectors: CCS2 (fast), Type 2 (AC), CHAdeMO (rare)
-- Booking NOT available — all first-come first-served
+- No advance booking — all first-come first-served
 - Climate: hot summers (35-45°C) affect battery — charge in evening when possible
 - Key routes: Cairo→Hurghada (460km), Cairo→Alex (220km), Cairo→Sharm (500km), Cairo→Sokhna (130km)
 
