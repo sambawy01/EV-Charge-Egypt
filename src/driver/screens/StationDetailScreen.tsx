@@ -229,20 +229,63 @@ export function StationDetailScreen({ route, navigation }: any) {
           )}
         </View>
 
-        {/* Station info */}
+        {/* Station info + Rating + Reliability */}
         <Card style={{ marginBottom: spacing.md }}>
           <Text style={{ ...typography.caption, color: colors.primary, fontWeight: '600', marginBottom: 4 }}>
             {(station as any).provider?.name}
           </Text>
-          <Text style={{ ...typography.body, color: colors.textSecondary }}>{station.address}</Text>
-          <View style={{ marginTop: spacing.sm }}>
-            <StationRating
-              stationId={station.id}
-              stationName={station.name}
-              currentRating={station.rating_avg}
-              reviewCount={station.review_count}
-            />
+          <Text style={{ ...typography.body, color: colors.textSecondary, marginBottom: 14 }}>{station.address}</Text>
+
+          {/* Rating + Reliability side by side */}
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
+            {/* Rating card */}
+            <View style={{
+              flex: 1, backgroundColor: colors.surfaceSecondary, borderRadius: 12, padding: 14,
+              borderWidth: 1, borderColor: '#FFB020' + '30', alignItems: 'center',
+            }}>
+              <Text style={{ ...typography.mono, fontSize: 28, color: '#FFB020' }}>
+                {station.rating_avg > 0 ? station.rating_avg.toFixed(1) : '—'}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 2, marginVertical: 4 }}>
+                {[1,2,3,4,5].map(s => (
+                  <Text key={s} style={{ fontSize: 14, color: s <= Math.round(station.rating_avg) ? '#FFB020' : colors.textTertiary }}>★</Text>
+                ))}
+              </View>
+              <Text style={{ ...typography.small, color: colors.textSecondary }}>{station.review_count} reviews</Text>
+            </View>
+
+            {/* Reliability score card */}
+            {(() => {
+              const reliabilityScore = station.rating_avg > 0 ? Math.round(station.rating_avg * 20) : null;
+              const reliabilityColor = reliabilityScore && reliabilityScore >= 80 ? colors.statusAvailable
+                : reliabilityScore && reliabilityScore >= 60 ? colors.statusPartial
+                : reliabilityScore ? colors.statusOccupied : colors.textTertiary;
+              const reliabilityLabel = reliabilityScore && reliabilityScore >= 80 ? 'Excellent'
+                : reliabilityScore && reliabilityScore >= 70 ? 'Good'
+                : reliabilityScore && reliabilityScore >= 60 ? 'Fair'
+                : reliabilityScore ? 'Poor' : 'Unknown';
+              return (
+                <View style={{
+                  flex: 1, backgroundColor: colors.surfaceSecondary, borderRadius: 12, padding: 14,
+                  borderWidth: 1, borderColor: (reliabilityColor || colors.border) + '30', alignItems: 'center',
+                }}>
+                  <Text style={{ ...typography.mono, fontSize: 28, color: reliabilityColor }}>
+                    {reliabilityScore ? `${reliabilityScore}%` : '—'}
+                  </Text>
+                  <Text style={{ fontSize: 14, marginVertical: 4 }}>🛡️</Text>
+                  <Text style={{ ...typography.small, color: colors.textSecondary }}>Reliability: {reliabilityLabel}</Text>
+                </View>
+              );
+            })()}
           </View>
+
+          {/* Rate & Review */}
+          <StationRating
+            stationId={station.id}
+            stationName={station.name}
+            currentRating={station.rating_avg}
+            reviewCount={station.review_count}
+          />
         </Card>
 
         {/* AI Prediction */}
