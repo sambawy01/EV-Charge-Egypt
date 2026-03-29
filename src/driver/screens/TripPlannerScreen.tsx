@@ -55,10 +55,12 @@ type Step = 1 | 2 | 3;
 // ---------------------------------------------------------------------------
 
 const POPULAR_ROUTES = [
-  { label: 'Cairo \u2192 Hurghada', from: 'Cairo', to: 'Hurghada' },
-  { label: 'Cairo \u2192 Alexandria', from: 'Cairo', to: 'Alexandria' },
-  { label: 'Cairo \u2192 Sharm', from: 'Cairo', to: 'Sharm El Sheikh' },
-  { label: 'Cairo \u2192 Ain Sokhna', from: 'Cairo', to: 'Ain Sokhna' },
+  { label: 'To Hurghada', from: '', to: 'Hurghada' },
+  { label: 'To Alexandria', from: '', to: 'Alexandria' },
+  { label: 'To Sharm El Sheikh', from: '', to: 'Sharm El Sheikh' },
+  { label: 'To Ain Sokhna', from: '', to: 'Ain Sokhna' },
+  { label: 'To North Coast', from: '', to: 'El Alamein' },
+  { label: 'To El Gouna', from: '', to: 'El Gouna' },
 ];
 
 const SPEED_OPTIONS = [100, 120, 140, 160];
@@ -73,7 +75,7 @@ export function TripPlannerScreen({ navigation }: any) {
 
   // Trip setup state
   const [step, setStep] = useState<Step>(1);
-  const [from, setFrom] = useState('Cairo');
+  const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [fromSuggestions, setFromSuggestions] = useState<{ description: string; placeId: string }[]>([]);
   const [toSuggestions, setToSuggestions] = useState<{ description: string; placeId: string }[]>([]);
@@ -82,6 +84,37 @@ export function TripPlannerScreen({ navigation }: any) {
   const [batteryLevel, setBatteryLevel] = useState(80);
   const [avgSpeed, setAvgSpeed] = useState(120);
   const [chargingStrategy, setChargingStrategy] = useState<ChargingStrategy>('quick');
+  const [locatingFrom, setLocatingFrom] = useState(false);
+
+  // Auto-detect user location for "From" on mount
+  useEffect(() => {
+    if (!from && navigator?.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          try {
+            const GMAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || '';
+            const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.coords.latitude},${pos.coords.longitude}&key=${GMAPS_KEY}&result_type=sublocality|neighborhood|route`;
+            const resp = await fetch(url);
+            const data = await resp.json();
+            if (data.status === 'OK' && data.results?.[0]) {
+              // Get a specific neighborhood/area name, not just "Cairo"
+              const components = data.results[0].address_components || [];
+              const neighborhood = components.find((c: any) => c.types.includes('sublocality') || c.types.includes('neighborhood'));
+              const locality = components.find((c: any) => c.types.includes('locality'));
+              const specificName = neighborhood?.long_name || locality?.long_name || data.results[0].formatted_address.split(',')[0];
+              setFrom(specificName);
+            } else {
+              setFrom('My Location');
+            }
+          } catch {
+            setFrom('My Location');
+          }
+        },
+        () => { setFrom(''); },
+        { enableHighAccuracy: true }
+      );
+    }
+  }, []);
   const [tripPlan, setTripPlan] = useState<TripPlan | null>(null);
 
   // Vehicle
@@ -552,6 +585,10 @@ export function TripPlannerScreen({ navigation }: any) {
   };
 
   const handlePlanTrip = () => {
+    if (!from.trim()) {
+      Alert.alert('Starting Point Required', 'Please enter your starting location or tap "Use my current location".');
+      return;
+    }
     if (!to.trim()) {
       Alert.alert('Destination Required', 'Please enter a destination to plan your trip.');
       return;
@@ -560,7 +597,8 @@ export function TripPlannerScreen({ navigation }: any) {
   };
 
   const handlePopularRoute = (route: (typeof POPULAR_ROUTES)[number]) => {
-    setFrom(route.from);
+    // Keep user's current "from" location if already set
+    if (route.from) setFrom(route.from);
     setTo(route.to);
   };
 
@@ -615,7 +653,7 @@ export function TripPlannerScreen({ navigation }: any) {
                 onChangeText={handleFromChange}
                 onFocus={() => setActiveField('from')}
                 onBlur={() => setTimeout(() => { if (activeField === 'from') setActiveField(null); }, 200)}
-                placeholder="From"
+                placeholder="Your location (e.g. Maadi, Nasr City)"
                 placeholderTextColor={colors.textTertiary}
                 style={{
                   flex: 1,
@@ -667,6 +705,43 @@ export function TripPlannerScreen({ navigation }: any) {
               </View>
             )}
           </View>
+          {/* Use my location button */}
+          <TouchableOpacity
+            onPress={() => {
+              setLocatingFrom(true);
+              if (navigator?.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                  async (pos) => {
+                    try {
+                      const GMAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || '';
+                      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.coords.latitude},${pos.coords.longitude}&key=${GMAPS_KEY}&result_type=sublocality|neighborhood|route`;
+                      const resp = await fetch(url);
+                      const data = await resp.json();
+                      if (data.status === 'OK' && data.results?.[0]) {
+                        const components = data.results[0].address_components || [];
+                        const neighborhood = components.find((c: any) => c.types.includes('sublocality') || c.types.includes('neighborhood'));
+                        const locality = components.find((c: any) => c.types.includes('locality'));
+                        setFrom(neighborhood?.long_name || locality?.long_name || data.results[0].formatted_address.split(',')[0]);
+                      }
+                    } catch {}
+                    setLocatingFrom(false);
+                  },
+                  () => setLocatingFrom(false),
+                  { enableHighAccuracy: true }
+                );
+              }
+            }}
+            style={{
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+              paddingVertical: 8, marginLeft: 38,
+              backgroundColor: colors.primaryLight, borderRadius: 8,
+            }}
+          >
+            <Text style={{ fontSize: 12 }}>{'\uD83D\uDCCD'}</Text>
+            <Text style={{ fontSize: 12, color: colors.primary, fontWeight: '600' }}>
+              {locatingFrom ? 'Detecting location...' : 'Use my current location'}
+            </Text>
+          </TouchableOpacity>
           {/* Separator */}
           <View
             style={{
