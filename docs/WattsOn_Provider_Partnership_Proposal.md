@@ -82,6 +82,33 @@ WattsOn eliminates fragmentation. We become the single interface between every E
 
 **Community ratings build your reputation.** WattsOn's community review system lets users rate station experiences. High-rated stations surface higher in recommendations. This creates a virtuous cycle: good stations get more traffic, which generates more positive reviews, which drives even more traffic.
 
+### "But We Already Show Availability in Our Own App"
+
+Yes — and that's exactly why you should integrate with WattsOn. Here's the reality:
+
+**Your app only reaches YOUR users.** The Infinity EV app has great real-time availability. But it only serves people who already downloaded the Infinity app, already have an Infinity account, and already know Infinity exists. That's maybe 20% of EV drivers in Egypt. The other 80% — the BYD driver who just bought their first EV, the tourist renting an EV in Hurghada, the fleet manager evaluating providers — they will never download 12 different provider apps.
+
+**Drivers don't want 12 apps.** Nobody installs Elsewedy Plug AND Sha7en AND IKARUS AND Infinity AND Electra AND KarmCharge apps. They want ONE app that shows EVERYTHING. That's WattsOn. When you share your availability data with us, you don't lose anything — your own app still works. But now your availability data reaches 5-10x more drivers than before.
+
+**Availability data DRIVES TRAFFIC TO YOU.** When a driver sees "Infinity EV - CPC Sharm: 3/4 Available ✅" on WattsOn and "Competitor Station: No data ❓" next to it, which one do they drive to? The one with confirmed availability. Sharing your data isn't giving away an advantage — it IS the advantage. The provider with real-time data on WattsOn wins the customer every time.
+
+**Without integration, you get crowdsourced data instead.** We already show station status through community reports. But crowdsourced data is less accurate and less timely than your real-time feed. If you don't integrate, drivers see "📡 Community reported: Available · 2h ago" instead of "✅ Live: 3/4 Available (real-time)". Which builds more trust in your brand?
+
+**The aggregator always wins.** Google Maps aggregated restaurant data. Booking.com aggregated hotels. Skyscanner aggregated flights. The providers who integrated early got the most traffic. The ones who refused became invisible. EV charging will follow the same pattern — the question isn't whether an aggregator will dominate, it's whether you'll be a featured partner or a generic pin on the map.
+
+**What we need from you is simple:**
+- An API endpoint that returns: station_id, connector_id, status (available/occupied/offline), last_updated
+- We poll every 2-5 minutes (or you push via webhook)
+- No sensitive data — just charger status
+- We display it as "✅ Live Status" with your branding and logo
+
+**What you get in return:**
+- Your availability data reaches every EV driver in Egypt, not just your app users
+- "Live Status" badge that competitors without integration don't get
+- AI preferentially recommends stations with confirmed availability
+- Fewer wasted trips to your stations = higher customer satisfaction
+- Data analytics on how users interact with your stations on WattsOn
+
 **Our marketing campaign markets you.** When our influencer content goes viral showing a celebrity charging at an Infinity EV station, that is free brand exposure for Infinity. Every WattsOn marketing touchpoint that shows a map of stations is marketing your network. You do not pay extra for it.
 
 **Data you cannot get anywhere else.** How does your station at CityStars compare to the Sha7en station 2km away? Which of your locations has the most navigation requests but the lowest utilization (signaling an accessibility or experience problem)? What car models are your most frequent users driving, and are you offering the right connector mix? We can answer all of this.
