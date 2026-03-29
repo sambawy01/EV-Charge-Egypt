@@ -132,6 +132,29 @@ export function MapScreen({ navigation }: any) {
         navigation.navigate('StationDetail', { stationId: data.stationId });
       }
       if (data.type === 'statusReport' && data.stationId && data.status) {
+        // Proximity check — must be within 100m
+        if (userLocation && data.lat && data.lng) {
+          const R = 6371000;
+          const dLat = (data.lat - userLocation.latitude) * Math.PI / 180;
+          const dLon = (data.lng - userLocation.longitude) * Math.PI / 180;
+          const a = Math.sin(dLat/2)**2 + Math.cos(userLocation.latitude*Math.PI/180) * Math.cos(data.lat*Math.PI/180) * Math.sin(dLon/2)**2;
+          const dist = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          if (dist > 100) {
+            Alert.alert(
+              '📍 Too Far Away',
+              'You need to be within 100 meters of the station to update its status. This helps ensure accurate, spam-free reports for all EV drivers.',
+              [{ text: 'Got it' }]
+            );
+            return;
+          }
+        } else if (!userLocation) {
+          Alert.alert(
+            '📍 Location Required',
+            'Please enable location services to report station status. You must be within 100 meters of the station.',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
         stationReportService.submitReport({
           stationId: data.stationId,
           status: data.status,
