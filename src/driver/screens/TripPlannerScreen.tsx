@@ -133,156 +133,89 @@ export function TripPlannerScreen({ navigation }: any) {
 
 
   // ---------------------------------------------------------------------------
-  // Fallback route data (used when Google Maps API is unavailable / CORS)
+  // Geocoding + corridor-based station finding (works for ANY route)
   // ---------------------------------------------------------------------------
 
-  const FALLBACK_ROUTES: Record<string, { distance: number; stops: any[] }> = {
-    hurghada: {
-      distance: 460,
-      stops:
-        chargingStrategy === 'quick'
-          ? [
-              {
-                stationName: 'Elsewedy Plug - SUT Ismailia Desert Road',
-                location: 'Ismailia Desert Road, KM 95',
-                distanceFromStart: 95,
-                chargerType: 'CCS2 50kW',
-                attractions: [
-                  { name: 'Oasis Rest House', type: 'Restaurant', distance: '50m', icon: '\uD83C\uDF7D\uFE0F' },
-                  { name: 'Desert Star Cafe', type: 'Coffee', distance: '100m', icon: '\u2615' },
-                ],
-              },
-              {
-                stationName: 'IKARUS Zafarana',
-                location: 'Zafarana Rest Area, KM 220',
-                distanceFromStart: 220,
-                chargerType: 'CCS2 120kW',
-                attractions: [
-                  { name: 'Red Sea Bakery', type: 'Bakery', distance: '200m', icon: '\uD83E\uDD50' },
-                  { name: 'Zafarana Viewpoint', type: 'Scenic', distance: '500m', icon: '\uD83C\uDF05' },
-                ],
-              },
-              {
-                stationName: 'Revolta Egypt - Wataniya Ras Gharib',
-                location: 'Ras Gharib, KM 340',
-                distanceFromStart: 340,
-                chargerType: 'CCS2 50kW',
-                attractions: [
-                  { name: 'Gulf Star Cafe', type: 'Coffee', distance: '150m', icon: '\u2615' },
-                  { name: 'Ras Gharib Beach', type: 'Beach', distance: '1km', icon: '\uD83C\uDFD6\uFE0F' },
-                ],
-              },
-            ]
-          : [
-              {
-                stationName: 'IKARUS Zafarana',
-                location: 'Zafarana Rest Area, KM 220',
-                distanceFromStart: 220,
-                chargerType: 'CCS2 120kW',
-                attractions: [
-                  { name: 'Red Sea Bakery', type: 'Bakery', distance: '200m', icon: '\uD83E\uDD50' },
-                  { name: 'Zafarana Viewpoint', type: 'Scenic', distance: '500m', icon: '\uD83C\uDF05' },
-                  { name: 'Desert Star Cafe', type: 'Coffee', distance: '300m', icon: '\u2615' },
-                ],
-              },
-              {
-                stationName: 'Revolta Egypt - Wataniya Ras Gharib',
-                location: 'Ras Gharib, KM 340',
-                distanceFromStart: 340,
-                chargerType: 'CCS2 50kW',
-                attractions: [
-                  { name: 'Gulf Star Cafe', type: 'Coffee', distance: '150m', icon: '\u2615' },
-                  { name: 'Ras Gharib Beach', type: 'Beach', distance: '1km', icon: '\uD83C\uDFD6\uFE0F' },
-                ],
-              },
-            ],
-    },
-    alexandria: {
-      distance: 220,
-      stops: [
-        {
-          stationName: 'Revolta Egypt - Watania Cairo-Alex Desert Road',
-          location: 'Desert Road Rest Stop, KM 110',
-          distanceFromStart: 110,
-          chargerType: 'CCS2 50kW',
-          attractions: [
-            { name: 'Highway Cafe', type: 'Coffee', distance: '50m', icon: '\u2615' },
-            { name: 'Wadi Natrun Monastery', type: 'Historic', distance: '15km', icon: '\uD83C\uDFDB\uFE0F' },
-          ],
-        },
-      ],
-    },
-    sharm: {
-      distance: 500,
-      stops:
-        chargingStrategy === 'quick'
-          ? [
-              {
-                stationName: 'Elsewedy Plug - SUT Ismailia Desert Road',
-                location: 'Suez Road, KM 120',
-                distanceFromStart: 120,
-                chargerType: 'CCS2 50kW',
-                attractions: [
-                  { name: 'Suez Canal View', type: 'Scenic', distance: '5km', icon: '\uD83C\uDF05' },
-                ],
-              },
-              {
-                stationName: 'Revolta Egypt - Watania Sharm Road',
-                location: 'El Tor, KM 350',
-                distanceFromStart: 350,
-                chargerType: 'CCS2 50kW',
-                attractions: [
-                  { name: 'El Tor Seafood', type: 'Restaurant', distance: '200m', icon: '\uD83C\uDF7D\uFE0F' },
-                  { name: 'Moses Springs', type: 'Historic', distance: '10km', icon: '\uD83C\uDFDB\uFE0F' },
-                ],
-              },
-            ]
-          : [
-              {
-                stationName: 'Revolta Egypt - Watania Sharm Road',
-                location: 'El Tor, KM 350',
-                distanceFromStart: 350,
-                chargerType: 'CCS2 50kW',
-                attractions: [
-                  { name: 'El Tor Seafood', type: 'Restaurant', distance: '200m', icon: '\uD83C\uDF7D\uFE0F' },
-                  { name: 'Moses Springs', type: 'Historic', distance: '10km', icon: '\uD83C\uDFDB\uFE0F' },
-                ],
-              },
-            ],
-    },
-    'ain sokhna': {
-      distance: 130,
-      stops: [
-        {
-          stationName: 'Elsewedy Plug - Ain Sokhna Road',
-          location: 'Ain Sokhna Road, KM 65',
-          distanceFromStart: 65,
-          chargerType: 'CCS2 50kW',
-          attractions: [
-            { name: 'Road Cafe', type: 'Coffee', distance: '100m', icon: '\u2615' },
-          ],
-        },
-      ],
-    },
-  };
+  async function geocodeCity(name: string): Promise<{lat: number, lng: number} | null> {
+    const GMAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || '';
+    if (!GMAPS_KEY) return null;
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(name + ', Egypt')}&key=${GMAPS_KEY}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+      if (data.status === 'OK' && data.results?.[0]) {
+        const loc = data.results[0].geometry.location;
+        return { lat: loc.lat, lng: loc.lng };
+      }
+    } catch {}
+    return null;
+  }
+
+  function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function findStationsAlongLine(
+    stations: any[],
+    fromLat: number, fromLng: number,
+    toLat: number, toLng: number,
+    maxDeviationKm: number = 20,
+  ): any[] {
+    const totalDist = haversineKm(fromLat, fromLng, toLat, toLng);
+
+    return stations
+      .map(s => {
+        const dx = toLng - fromLng;
+        const dy = toLat - fromLat;
+        const t = Math.max(0, Math.min(1,
+          ((s.longitude - fromLng) * dx + (s.latitude - fromLat) * dy) / (dx * dx + dy * dy)
+        ));
+
+        const closestLat = fromLat + t * dy;
+        const closestLng = fromLng + t * dx;
+        const deviation = haversineKm(s.latitude, s.longitude, closestLat, closestLng);
+        const distFromStart = t * totalDist;
+
+        if (deviation <= maxDeviationKm && t > 0.05 && t < 0.95) {
+          return { ...s, distanceFromStart: Math.round(distFromStart), deviationKm: deviation };
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.distanceFromStart - b.distanceFromStart);
+  }
+
+  // Last resort plan when ALL APIs fail (no geocoding, no directions)
+  function getLastResortPlan(): TripPlan {
+    return {
+      from,
+      to,
+      totalDistance: 400,
+      totalTime: '5h 0m',
+      totalChargeCost: 150,
+      arrivalBattery: 30,
+      stops: [{
+        stationName: 'Charging Station (estimated)',
+        location: 'Along the route',
+        distanceFromStart: 200,
+        arrivalBattery: 15,
+        chargeToPercent: 80,
+        chargeDuration: 35,
+        chargeCost: 150,
+        chargerType: 'CCS2 50kW',
+        attractions: [],
+      }],
+    };
+  }
 
   // ---------------------------------------------------------------------------
   // Helpers for real-data trip planning
   // ---------------------------------------------------------------------------
-
-  function getFallbackDistance(destination: string): number {
-    const distances: Record<string, number> = {
-      hurghada: 460, alexandria: 220, sharm: 500, sokhna: 130,
-    };
-    const key = Object.keys(distances).find((k) => destination.toLowerCase().includes(k));
-    return distances[key || 'hurghada'] || 400;
-  }
-
-  function getFallbackStops(destination: string): any[] {
-    const dest = destination.toLowerCase();
-    const routeKey = Object.keys(FALLBACK_ROUTES).find((k) => dest.includes(k)) || 'hurghada';
-    return FALLBACK_ROUTES[routeKey].stops;
-  }
 
   function selectOptimalStops(
     stations: any[],
@@ -291,7 +224,7 @@ export function TripPlannerScreen({ navigation }: any) {
     kmPerPercent: number,
     strategy: string,
   ): any[] {
-    if (!stations.length) return getFallbackStops(to);
+    if (!stations.length) return [];
 
     const minBatteryAtArrival = 15;
     const chargeTarget = strategy === 'quick' ? 65 : 85;
@@ -480,15 +413,61 @@ export function TripPlannerScreen({ navigation }: any) {
         return buildTripPlan(stopsWithAttractions, directions.totalDistanceKm);
       }
     } catch (err) {
-      console.warn('[TripPlanner] Real data planning failed, using fallback:', err);
+      console.warn('[TripPlanner] Directions API failed, trying geocode fallback:', err);
     }
 
-    // Fallback: use hardcoded route data
-    const dest = to.toLowerCase();
-    const routeKey =
-      Object.keys(FALLBACK_ROUTES).find((k) => dest.includes(k)) || 'hurghada';
-    const route = FALLBACK_ROUTES[routeKey];
-    return buildTripPlan(route.stops, route.distance);
+    // Fallback: geocode both cities and find stations along the corridor
+    try {
+      const [fromCoords, toCoords] = await Promise.all([geocodeCity(from), geocodeCity(to)]);
+
+      if (fromCoords && toCoords) {
+        const straightDist = haversineKm(fromCoords.lat, fromCoords.lng, toCoords.lat, toCoords.lng);
+        const roadDistance = Math.round(straightDist * 1.3); // Egyptian roads ~30% longer than straight line
+
+        const allStations = await stationService.getStations();
+        const routeStations = findStationsAlongLine(
+          allStations, fromCoords.lat, fromCoords.lng, toCoords.lat, toCoords.lng, 25
+        );
+
+        // Adjust distanceFromStart to road-distance scale (stations found on straight line)
+        const scaledStations = routeStations.map((s: any) => ({
+          ...s,
+          distanceFromStart: Math.round(s.distanceFromStart * 1.3),
+          stationName: s.name || s.stationName || 'Charging Station',
+          stationId: s.id,
+          location: s.address || s.city || `KM ${Math.round(s.distanceFromStart * 1.3)}`,
+          chargerType: s.connectors?.[0]
+            ? `${s.connectors[0].type} ${s.connectors[0].power_kw}kW`
+            : 'CCS2 50kW',
+        }));
+
+        const selectedStops = selectOptimalStops(
+          scaledStations, roadDistance, batteryLevel, kmPerPercent, chargingStrategy
+        );
+
+        // Get nearby attractions for each stop
+        const stopsWithAttractions = await Promise.all(
+          selectedStops.map(async (stop: any) => {
+            try {
+              const nearby = await googleMapsService.getNearbyPlaces(stop.latitude, stop.longitude, 1000);
+              return {
+                ...stop,
+                attractions: nearby.length > 0
+                  ? nearby.map((p: any) => ({ name: p.name, type: p.type, distance: p.distance, icon: p.icon }))
+                  : [],
+              };
+            } catch { return { ...stop, attractions: [] }; }
+          })
+        );
+
+        return buildTripPlan(stopsWithAttractions, roadDistance);
+      }
+    } catch (err) {
+      console.warn('[TripPlanner] Geocode fallback also failed:', err);
+    }
+
+    // Last resort: generic estimated plan when all APIs fail
+    return getLastResortPlan();
   }, [from, to, batteryLevel, avgSpeed, chargingStrategy, selectedVehicle, spec]);
 
   // ---------------------------------------------------------------------------
