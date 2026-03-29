@@ -12,10 +12,20 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/core/theme';
 import { typography } from '@/core/theme/typography';
 import { useVehicles } from '@/core/queries/useVehicles';
+import { useAuthStore } from '@/core/stores/authStore';
 import {
   vehicleAnalysisService,
   VehicleAnalysis,
 } from '@/core/services/vehicleAnalysisService';
+
+const DEMO_VEHICLE = {
+  id: 'demo-vehicle',
+  make: 'BYD',
+  model: 'Atto 3',
+  year: 2024,
+  battery_capacity_kwh: 60.48,
+  connector_types: ['CCS', 'Type2'],
+};
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -104,17 +114,22 @@ function MetricCard({
 
 export function VehicleDashboardScreen({ navigation }: any) {
   const { colors, isDark } = useTheme();
+  const user = useAuthStore((s) => s.user);
   const { data: vehicles, isLoading: vehiclesLoading } = useVehicles();
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null);
   const [analysis, setAnalysis] = useState<VehicleAnalysis | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
 
+  // If demo mode and no vehicles, use a demo vehicle
+  const isDemoUser = user?.id === 'demo-user';
+  const activeVehicles = vehicles?.length ? vehicles : (isDemoUser ? [DEMO_VEHICLE] : []);
+
   // Auto-select first vehicle
   useEffect(() => {
-    if (vehicles?.length && !selectedVehicle) {
-      setSelectedVehicle(vehicles[0]);
+    if (activeVehicles.length && !selectedVehicle) {
+      setSelectedVehicle(activeVehicles[0]);
     }
-  }, [vehicles]);
+  }, [activeVehicles]);
 
   // Run analysis when vehicle changes
   useEffect(() => {
@@ -132,7 +147,7 @@ export function VehicleDashboardScreen({ navigation }: any) {
   }, [navigation]);
 
   // ---- No vehicle state ----
-  if (!vehiclesLoading && (!vehicles || vehicles.length === 0)) {
+  if (!vehiclesLoading && activeVehicles.length === 0) {
     return (
       <View
         style={{
@@ -246,13 +261,13 @@ export function VehicleDashboardScreen({ navigation }: any) {
       {/* ============================================================ */}
       {/* VEHICLE SELECTOR                                             */}
       {/* ============================================================ */}
-      {vehicles && vehicles.length > 1 && (
+      {activeVehicles.length > 1 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 20, paddingVertical: 12, gap: 10 }}
         >
-          {vehicles.map((v: any) => {
+          {activeVehicles.map((v: any) => {
             const isSelected = v.id === selectedVehicle?.id;
             return (
               <TouchableOpacity

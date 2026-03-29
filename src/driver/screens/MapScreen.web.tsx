@@ -21,6 +21,7 @@ import { typography } from '@/core/theme/typography';
 import type { Station } from '@/core/types/station';
 import { aiContextService } from '@/core/services/aiContextService';
 import { stationReportService } from '@/core/services/stationReportService';
+import { supabase } from '@/core/config/supabase';
 import { useVehicles } from '@/core/queries/useVehicles';
 
 // ---------------------------------------------------------------------------
@@ -218,6 +219,19 @@ export function MapScreen({ navigation }: any) {
     stationReportService.getAllLiveStatuses().then(setLiveStatuses);
   }, []);
 
+  // Subscribe to real-time status updates
+  useEffect(() => {
+    const channel = supabase
+      .channel('station-reports')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'station_reports' }, () => {
+        // Refresh live statuses when a new report comes in
+        stationReportService.getAllLiveStatuses().then(setLiveStatuses);
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   const { width: screenWidth } = useWindowDimensions();
   const isMobile = screenWidth < 768;
 
@@ -259,6 +273,43 @@ export function MapScreen({ navigation }: any) {
             onChangeText={setSearchQuery}
           />
         </View>
+
+        {/* Filter chips overlay - below search bar */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{
+            position: 'absolute',
+            top: 64,
+            left: 0,
+            right: 0,
+            paddingHorizontal: 12,
+          }}
+          contentContainerStyle={{ gap: 6, paddingRight: 12 }}
+        >
+          {FILTER_CHIPS.map((chip) => (
+            <TouchableOpacity
+              key={chip}
+              onPress={() => setActiveChip(chip)}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 16,
+                backgroundColor: activeChip === chip ? colors.primaryLight : colors.surface,
+                borderWidth: 1,
+                borderColor: activeChip === chip ? colors.primary : colors.border,
+              }}
+            >
+              <Text style={{
+                fontSize: 11,
+                fontWeight: '600',
+                color: activeChip === chip ? colors.primary : colors.textSecondary,
+              }}>
+                {chip}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* Bottom station count + nearest station cards */}
         <View style={{

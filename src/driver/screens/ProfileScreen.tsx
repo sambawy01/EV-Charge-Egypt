@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Avatar, LoadingScreen } from '@/core/components';
 import { useAuthStore } from '@/core/stores/authStore';
 import { useChargingStats } from '@/core/queries/useProfile';
@@ -9,11 +10,26 @@ import { useTheme } from '@/core/theme';
 import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
+const LANG_STORAGE_KEY = 'ev_charge_lang';
+
 export function ProfileScreen({ navigation }: any) {
   const { colors, isDark, toggleTheme } = useTheme();
   const user = useAuthStore((s) => s.user);
   const { signOut } = useAuth();
   const { data: stats } = useChargingStats();
+  const [lang, setLang] = useState<'en' | 'ar'>('en');
+
+  useEffect(() => {
+    AsyncStorage.getItem(LANG_STORAGE_KEY).then((stored) => {
+      if (stored === 'ar' || stored === 'en') setLang(stored);
+    });
+  }, []);
+
+  const toggleLang = async () => {
+    const next = lang === 'en' ? 'ar' : 'en';
+    setLang(next);
+    await AsyncStorage.setItem(LANG_STORAGE_KEY, next);
+  };
 
   if (!user) return <LoadingScreen />;
 
@@ -143,6 +159,43 @@ export function ProfileScreen({ navigation }: any) {
             thumbColor={isDark ? colors.primary : colors.textTertiary}
           />
         </View>
+
+        {/* Language Toggle */}
+        <View
+          style={[
+            styles.menuItem,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={styles.menuIcon}>{'\uD83C\uDF10'}</Text>
+          <Text style={[styles.menuLabel, { color: colors.text }]}>
+            {lang === 'ar' ? '\u0627\u0644\u0639\u0631\u0628\u064A\u0629' : 'English'}
+          </Text>
+          <TouchableOpacity
+            onPress={toggleLang}
+            style={{
+              backgroundColor: colors.primaryLight,
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: colors.primary,
+            }}
+          >
+            <Text style={{ ...typography.small, color: colors.primary, fontWeight: '600' }}>
+              {lang === 'en' ? '\u0627\u0644\u0639\u0631\u0628\u064A\u0629' : 'English'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* App info */}
+      <View style={{ marginTop: 24, alignItems: 'center', paddingBottom: 32 }}>
+        <Text style={{ ...(typography.caption as object), color: colors.textTertiary }}>WattsOn v1.0.0</Text>
+        <Text style={{ ...(typography.small as object), color: colors.textTertiary, marginTop: 4 }}>Egypt's Smart EV Charging Platform</Text>
       </View>
 
       {/* Sign Out */}

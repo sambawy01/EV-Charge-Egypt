@@ -236,6 +236,16 @@ export const stationService = {
   // Internal helpers
   // ---------------------------------------------------------------------------
 
+  /**
+   * Fetch all stations from Supabase. For the map view we need every station
+   * so we load them all in one call. The 10-minute OCM_CACHE_TTL prevents
+   * re-fetching on every render.
+   *
+   * TODO: For future list/search views, add pagination:
+   *   async _getStationsFromSupabase(page = 0, limit = 100) {
+   *     ...supabase.range(page * limit, (page + 1) * limit - 1)
+   *   }
+   */
   async _getStationsFromSupabase(): Promise<Station[]> {
     const { data, error } = await supabase
       .from('stations')
