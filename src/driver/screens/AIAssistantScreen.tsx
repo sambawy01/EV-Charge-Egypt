@@ -290,10 +290,9 @@ export function AIAssistantScreen({ navigation }: any) {
     // Real-time battery estimate
     if (vehicles?.[0]) {
       const v = vehicles[0];
-      const estimatedPct = Math.round(40 + Math.random() * 30);
       items.push({
         icon: '🔋',
-        text: `Your ${v.make} ${v.model} has ~${estimatedPct}% battery estimated. ${estimatedPct < 30 ? 'Consider charging soon!' : 'Looking good!'}`,
+        text: `Track your charging patterns in the Vehicle tab for personalized battery insights.`,
         color: colors.primary,
       });
     }

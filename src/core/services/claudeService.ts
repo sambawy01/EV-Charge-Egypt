@@ -1,11 +1,3 @@
-// WARNING: Direct browser API calls expose the API key in client bundles.
-// For production, move this to a Supabase Edge Function (ai-chat) or backend proxy.
-// The ANTHROPIC_KEY should ONLY live server-side. This client fallback exists for
-// development convenience and should be removed before public release.
-// See: supabase/functions/ai-chat for the server-side implementation.
-const ANTHROPIC_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY || '';
-const API_URL = 'https://api.anthropic.com/v1/messages';
-
 export interface ClaudeMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -108,47 +100,10 @@ ${stationList}
       }
       // If edge function returned an error or unexpected shape, fall through
     } catch {
-      // Edge function unavailable — fall through to direct API
+      // Edge function unavailable — fall through to keyword-based fallback
     }
 
-    // --- 2. Fallback: direct API call (development only — remove for production) ---
-    if (ANTHROPIC_KEY) {
-      try {
-        const messages = [
-          ...conversationHistory.map(m => ({ role: m.role, content: m.content })),
-          { role: 'user' as const, content: userMessage },
-        ];
-
-        const response = await fetch(API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': ANTHROPIC_KEY,
-            'anthropic-version': '2023-06-01',
-            'anthropic-dangerous-direct-browser-access': 'true',
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 500,
-            system: systemPrompt,
-            messages,
-          }),
-        });
-
-        if (!response.ok) {
-          const errText = await response.text();
-          console.warn('[claudeService] API error:', response.status, errText);
-          return this.fallbackResponse(userMessage);
-        }
-
-        const data = await response.json();
-        return data.content?.[0]?.text || this.fallbackResponse(userMessage);
-      } catch (err) {
-        console.warn('[claudeService] Fetch failed:', err);
-      }
-    }
-
-    // --- 3. Final fallback: keyword-based response ---
+    // --- 2. Fallback: keyword-based response ---
     return this.fallbackResponse(userMessage);
   },
 

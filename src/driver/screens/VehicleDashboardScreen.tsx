@@ -91,7 +91,7 @@ function MetricCard({
           <Text style={{ ...typography.mono, fontSize: 28, color: valueColor, marginBottom: 6 }}>
             {value}
           </Text>
-          <Text style={{ ...typography.body, fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>{label}</Text>
+          <Text style={{ ...typography.body, fontSize: 14, color: colors.text }}>{label}</Text>
         </View>
       </LinearGradient>
     </View>
@@ -477,7 +477,7 @@ export function VehicleDashboardScreen({ navigation }: any) {
                   battery.temperatureImpact.slice(1)}
               </Text>
             </Text>
-            <Text style={{ ...typography.body, fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 22 }}>
+            <Text style={{ ...typography.body, fontSize: 14, color: colors.text, lineHeight: 22 }}>
               {battery.temperatureNote}
             </Text>
           </View>
@@ -812,7 +812,7 @@ export function VehicleDashboardScreen({ navigation }: any) {
                 <Text
                   style={{
                     ...typography.body,
-                    color: 'rgba(255,255,255,0.85)',
+                    color: colors.text,
                     lineHeight: 22,
                     fontSize: 14,
                   }}

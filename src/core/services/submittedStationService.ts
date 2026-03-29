@@ -76,6 +76,9 @@ export const submittedStationService = {
         .single();
       if (fetchError || !station) return false;
 
+      // Don't allow the submitter to verify their own station
+      if (station.submitted_by === userId) return false;
+
       // Check if user already verified
       if ((station.verified_by || []).includes(userId)) return false;
 

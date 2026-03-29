@@ -291,8 +291,12 @@ export function StationDetailScreen({ route, navigation }: any) {
 
         {/* AI Prediction */}
         <Card style={{ marginBottom: spacing.md }}>
-          <Text style={{ ...typography.bodyBold, color: colors.text, marginBottom: spacing.sm }}>AI Prediction</Text>
-          <Text style={{ ...typography.body, color: colors.accent, fontStyle: 'italic' }}>Usually free at this time</Text>
+          <Text style={{ ...typography.bodyBold, color: colors.text, marginBottom: spacing.sm }}>Community Status</Text>
+          <Text style={{ ...typography.body, color: colors.textSecondary, fontStyle: 'italic' }}>
+            {liveStatus
+              ? `Last reported: ${liveStatus.status === 'available' ? 'Available' : liveStatus.status === 'busy' ? 'Busy' : liveStatus.status === 'partially_available' ? 'Partially available' : 'Out of service'} (${liveStatus.timeAgo})`
+              : 'No community reports yet — be the first to report!'}
+          </Text>
         </Card>
 
         {/* Connectors */}

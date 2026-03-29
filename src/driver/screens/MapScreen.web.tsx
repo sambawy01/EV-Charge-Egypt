@@ -118,7 +118,9 @@ export function MapScreen({ navigation }: any) {
   const { searchQuery, filters, setSearchQuery, setFilters } = useMapStore();
   const [showFilter, setShowFilter] = useState(false);
   const [activeChip, setActiveChip] = useState<FilterChip>('All');
-  const { location: userLocation, resolved: gpsResolved } = useWebLocation();
+  const { location: hookLocation, resolved: gpsResolved } = useWebLocation();
+  const [manualLocation, setManualLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const userLocation = manualLocation || hookLocation;
 
   const { data: stations, isLoading } = useStations(filters, userLocation);
   const { data: vehicles } = useVehicles();
@@ -385,6 +387,40 @@ export function MapScreen({ navigation }: any) {
             })}
           </ScrollView>
         </View>
+
+        {/* Locate Me button */}
+        <TouchableOpacity
+          onPress={() => {
+            if (navigator?.geolocation) {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                  setManualLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+                },
+                () => Alert.alert('Location Error', 'Could not get your location'),
+                { enableHighAccuracy: true }
+              );
+            }
+          }}
+          style={{
+            position: 'absolute',
+            bottom: 220,
+            right: 16,
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: '#000',
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+            elevation: 5,
+          }}
+        >
+          <Text style={{ fontSize: 20 }}>{'\uD83D\uDCCD'}</Text>
+        </TouchableOpacity>
 
         {/* Proximity detection popup */}
         <ProximityReporter stations={displayStations} userLocation={userLocation} />

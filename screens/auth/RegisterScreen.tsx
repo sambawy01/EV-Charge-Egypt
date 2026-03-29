@@ -39,8 +39,8 @@ export function RegisterScreen({ navigation }: any) {
       return;
     }
 
-    if (password.length < 6) {
-      Alert.alert('Weak Password', 'Password must be at least 6 characters.');
+    if (password.length < 8) {
+      Alert.alert('Weak Password', 'Password must be at least 8 characters.');
       return;
     }
 
