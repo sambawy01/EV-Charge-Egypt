@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Button } from '@/core/components';
 import { useAuth } from '@/core/auth/useAuth';
 import { useTheme } from '@/core/theme';
+import { supabase } from '@/core/config/supabase';
 import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
@@ -23,6 +24,20 @@ export function LoginScreen({ navigation }: any) {
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const { signIn, isLoading } = useAuth();
   const { colors } = useTheme();
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert('Email Required', 'Please enter your email address first.');
+      return;
+    }
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      if (error) throw error;
+      Alert.alert('Password Reset', 'Check your email for a password reset link.');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Could not send reset email.');
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -111,7 +126,7 @@ export function LoginScreen({ navigation }: any) {
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>Password</Text>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={handleForgotPassword}>
                   <Text style={[styles.forgotLink, { color: colors.primary }]}>
                     Forgot password?
                   </Text>

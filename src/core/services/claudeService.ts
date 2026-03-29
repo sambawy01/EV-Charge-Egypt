@@ -1,3 +1,8 @@
+// WARNING: Direct browser API calls expose the API key in client bundles.
+// For production, move this to a Supabase Edge Function (ai-chat) or backend proxy.
+// The ANTHROPIC_KEY should ONLY live server-side. This client fallback exists for
+// development convenience and should be removed before public release.
+// See: supabase/functions/ai-chat for the server-side implementation.
 const ANTHROPIC_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY || '';
 const API_URL = 'https://api.anthropic.com/v1/messages';
 
@@ -21,29 +26,24 @@ export interface StationContext {
 }
 
 export const claudeService = {
-  async chat(
-    userMessage: string,
-    context: {
-      vehicleMake?: string;
-      vehicleModel?: string;
-      batteryKwh?: number;
-      rangeKm?: number;
-      stationCount?: number;
-      userName?: string;
-      stations?: StationContext[];
-      batteryInfo?: string;
-    },
-    conversationHistory: ClaudeMessage[] = [],
-  ): Promise<string> {
-    if (!ANTHROPIC_KEY) {
-      return this.fallbackResponse(userMessage);
-    }
-
+  /**
+   * Build the system prompt from context — extracted so both paths can reuse it.
+   */
+  buildSystemPrompt(context: {
+    vehicleMake?: string;
+    vehicleModel?: string;
+    batteryKwh?: number;
+    rangeKm?: number;
+    stationCount?: number;
+    userName?: string;
+    stations?: StationContext[];
+    batteryInfo?: string;
+  }): string {
     const stationList = context.stations?.slice(0, 15).map((s, i) =>
       `${i + 1}. ${s.name} (${s.distance}) — ${s.connectors || 'Type 2'} ${s.power} — ${s.status} — ${s.city}`
     ).join('\n') || 'No station data available';
 
-    const systemPrompt = `You are WattsOn AI, the intelligent copilot for WattsOn — Egypt's smart EV charging app.
+    return `You are WattsOn AI, the intelligent copilot for WattsOn — Egypt's smart EV charging app.
 
 ## Your Personality
 - Friendly, knowledgeable, concise
@@ -75,41 +75,81 @@ ${stationList}
 6. If the user wants to navigate somewhere or take an action, include an ACTION line at the end of your response in the format: ACTION:navigate:stationName or ACTION:trip:destination or ACTION:map:filterType
 7. Be specific about power levels, connector types, and distances
 8. ${context.userName ? `Address the user as ${context.userName} occasionally` : ''}`;
+  },
 
+  async chat(
+    userMessage: string,
+    context: {
+      vehicleMake?: string;
+      vehicleModel?: string;
+      batteryKwh?: number;
+      rangeKm?: number;
+      stationCount?: number;
+      userName?: string;
+      stations?: StationContext[];
+      batteryInfo?: string;
+    },
+    conversationHistory: ClaudeMessage[] = [],
+  ): Promise<string> {
+    const systemPrompt = this.buildSystemPrompt(context);
+
+    // --- 1. Try Supabase Edge Function first (server-side, API key is safe) ---
     try {
-      const messages = [
-        ...conversationHistory.map(m => ({ role: m.role, content: m.content })),
-        { role: 'user' as const, content: userMessage },
-      ];
-
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': ANTHROPIC_KEY,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 500,
+      const { supabase } = await import('../config/supabase');
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          message: userMessage,
           system: systemPrompt,
-          messages,
-        }),
+          history: conversationHistory.slice(-10),
+        },
       });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        console.warn('[claudeService] API error:', response.status, errText);
-        return this.fallbackResponse(userMessage);
+      if (!error && data?.response) {
+        return data.response;
       }
-
-      const data = await response.json();
-      return data.content?.[0]?.text || this.fallbackResponse(userMessage);
-    } catch (err) {
-      console.warn('[claudeService] Fetch failed:', err);
-      return this.fallbackResponse(userMessage);
+      // If edge function returned an error or unexpected shape, fall through
+    } catch {
+      // Edge function unavailable — fall through to direct API
     }
+
+    // --- 2. Fallback: direct API call (development only — remove for production) ---
+    if (ANTHROPIC_KEY) {
+      try {
+        const messages = [
+          ...conversationHistory.map(m => ({ role: m.role, content: m.content })),
+          { role: 'user' as const, content: userMessage },
+        ];
+
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_KEY,
+            'anthropic-version': '2023-06-01',
+            'anthropic-dangerous-direct-browser-access': 'true',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 500,
+            system: systemPrompt,
+            messages,
+          }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          console.warn('[claudeService] API error:', response.status, errText);
+          return this.fallbackResponse(userMessage);
+        }
+
+        const data = await response.json();
+        return data.content?.[0]?.text || this.fallbackResponse(userMessage);
+      } catch (err) {
+        console.warn('[claudeService] Fetch failed:', err);
+      }
+    }
+
+    // --- 3. Final fallback: keyword-based response ---
+    return this.fallbackResponse(userMessage);
   },
 
   fallbackResponse(input: string): string {

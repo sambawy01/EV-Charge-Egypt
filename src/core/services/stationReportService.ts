@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase';
+import { useAuthStore } from '../stores/authStore';
 
 export type StationStatus = 'available' | 'busy' | 'out_of_service' | 'partially_available';
 
@@ -47,6 +48,18 @@ function getConfidence(lastReportDate: string): 'high' | 'medium' | 'low' {
 let _reportCache: { data: Map<string, StationReport[]>; fetchedAt: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// Client-side rate limiting
+let _reportTimestamps: number[] = [];
+const MAX_REPORTS_PER_MINUTE = 5;
+
+function isRateLimited(): boolean {
+  const now = Date.now();
+  _reportTimestamps = _reportTimestamps.filter(t => now - t < 60000);
+  if (_reportTimestamps.length >= MAX_REPORTS_PER_MINUTE) return true;
+  _reportTimestamps.push(now);
+  return false;
+}
+
 function buildLiveStatus(reports: StationReport[]): StationLiveStatus {
   const latest = reports[0];
   const last24h = reports.filter(
@@ -75,14 +88,22 @@ export const stationReportService = {
     totalSpots?: number;
     comment?: string;
   }): Promise<boolean> {
+    if (isRateLimited()) {
+      console.warn('[stationReportService] Rate limited — max 5 reports per minute');
+      return false;
+    }
+
+    // Always attach a user_id — required by RLS policy
+    const effectiveUserId = report.userId || useAuthStore.getState().user?.id || 'anonymous';
+
     try {
       const { error } = await supabase.from('station_reports').insert({
         station_id: report.stationId,
-        user_id: report.userId || null,
+        user_id: effectiveUserId,
         status: report.status,
         available_spots: report.availableSpots ?? null,
         total_spots: report.totalSpots ?? null,
-        comment: report.comment || null,
+        comment: report.comment?.slice(0, 500) || null,
       });
       if (error) throw error;
       // Invalidate cache

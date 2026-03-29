@@ -28,12 +28,24 @@ export function RegisterScreen({ navigation }: any) {
   const { colors } = useTheme();
 
   const handleRegister = async () => {
-    if (!fullName || !email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!fullName.trim()) {
+      Alert.alert('Name Required', 'Please enter your name.');
       return;
     }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Weak Password', 'Password must be at least 6 characters.');
+      return;
+    }
+
     try {
-      await signUp(email, password, fullName, role);
+      await signUp(email, password, fullName.trim(), role);
     } catch (e: any) {
       Alert.alert('Registration Failed', e.message);
     }
