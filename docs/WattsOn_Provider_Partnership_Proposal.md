@@ -109,6 +109,92 @@ Yes — and that's exactly why you should integrate with WattsOn. Here's the rea
 - Fewer wasted trips to your stations = higher customer satisfaction
 - Data analytics on how users interact with your stations on WattsOn
 
+### WattsOn as Your Payment Gateway
+
+The real unlock isn't just showing availability — it's letting drivers **pay through WattsOn**. Here's why this transforms the business for both sides:
+
+**The Problem for Drivers Today:**
+- Each provider requires their own app, their own account, their own payment method
+- A driver traveling Cairo → Hurghada might need 3 different apps to pay at 3 different stations
+- Some stations only accept specific payment methods or prepaid credits
+- New EV buyers are overwhelmed: "I just want to charge and pay, why do I need 12 accounts?"
+
+**The Problem for Providers:**
+- Payment processing is expensive to build and maintain (PCI compliance, fraud, refunds)
+- Onboarding new customers is friction-heavy (download app → create account → add payment → verify)
+- Payment failures = lost revenue (card declines, expired sessions, app crashes)
+- Cash collection at unmanned stations is impossible
+- Each provider reinvents the same payment wheel
+
+**WattsOn as the Universal Charging Payment:**
+
+One account. One wallet. Every station in Egypt.
+
+The driver tops up their WattsOn wallet once (credit card, Fawry, Vodafone Cash, InstaPay) and can pay at ANY partner station — Infinity, Elsewedy, Sha7en, IKARUS, Electra — without downloading anything else.
+
+**How it works:**
+
+1. **Driver arrives at station** → WattsOn detects proximity
+2. **Selects charger** → sees connector type, power, and price per kWh
+3. **Taps "Start Charging"** → WattsOn initiates the session via provider's API
+4. **Charges their car** → real-time kWh counter in the app
+5. **Session ends** → WattsOn deducts from wallet, settles with provider
+
+**Revenue Model:**
+
+| Party | Per Session |
+|---|---|
+| Provider receives | 93% of charging fee |
+| WattsOn commission | 5% |
+| Payment processor | 2% |
+
+**Example:** A 30 kWh charge at 3.5 EGP/kWh = 105 EGP total
+- Provider gets: 97.65 EGP
+- WattsOn gets: 5.25 EGP
+- Payment processor: 2.10 EGP
+
+**Why providers should want this:**
+
+1. **Zero payment infrastructure cost.** WattsOn handles PCI compliance, fraud detection, refunds, chargebacks, and multi-method payment processing. The provider focuses on hardware and electricity — we handle the money.
+
+2. **Instant customer base.** Every WattsOn user can pay at your station on day one. No app download, no account creation, no payment setup. The friction that costs you 70% of potential customers at the onboarding step? Gone.
+
+3. **Higher utilization = higher revenue.** More payment options = more completed sessions. The driver who would have driven past because they didn't have your app? Now they stop and charge. At 5% commission on incremental revenue that wouldn't have existed otherwise, it's pure profit for both sides.
+
+4. **Multiple payment methods you don't support.** WattsOn accepts:
+   - Credit/debit cards (Visa, Mastercard)
+   - Fawry (Egypt's largest bill payment network — 200K+ points of sale)
+   - Vodafone Cash / Orange Money / Etisalat Cash (mobile wallets)
+   - InstaPay (instant bank transfers)
+   - Apple Pay / Google Pay
+   - WattsOn prepaid wallet (top-up model)
+
+   Most providers only support credit cards. WattsOn opens charging to the 60% of Egyptians who primarily use mobile money or cash-based payment.
+
+5. **Automated settlement.** Provider receives daily/weekly settlement reports with full breakdown: which station, which connector, kWh delivered, amount earned, commission deducted. Direct bank transfer, no invoicing hassle.
+
+6. **Fleet billing.** Fleet managers can set up company accounts with centralized billing. All their drivers charge on one account, one invoice. This is a feature most providers can't offer alone.
+
+**For the Strategic Alliance tier:**
+
+Partners who integrate payment through WattsOn get:
+- 5% commission (vs 15-30% on other platforms) — we take less because we want adoption
+- First 6 months at 3% commission for founding partners
+- Real-time settlement dashboard
+- Dispute resolution handled by WattsOn
+- Branded receipt: "Charged at [Provider Name] via WattsOn"
+- Tax-compliant invoicing for B2B/fleet customers
+
+**The bigger picture:**
+
+WattsOn becomes the **Visa of EV charging** — the payment layer that sits between every driver and every station. Providers don't compete on payment UX anymore; they compete on station quality, location, and price. Everyone wins:
+
+- **Drivers:** One wallet, every station, no friction
+- **Providers:** More customers, zero payment headaches, daily settlement
+- **WattsOn:** 5% of every kWh charged in Egypt flows through the platform
+
+**This is how we become indispensable.** Once drivers load money into WattsOn and providers receive payments through WattsOn, switching costs are high for everyone. The aggregator isn't just a map anymore — it's the financial infrastructure of Egypt's EV charging ecosystem.
+
 **Our marketing campaign markets you.** When our influencer content goes viral showing a celebrity charging at an Infinity EV station, that is free brand exposure for Infinity. Every WattsOn marketing touchpoint that shows a map of stations is marketing your network. You do not pay extra for it.
 
 **Data you cannot get anywhere else.** How does your station at CityStars compare to the Sha7en station 2km away? Which of your locations has the most navigation requests but the lowest utilization (signaling an accessibility or experience problem)? What car models are your most frequent users driving, and are you offering the right connector mix? We can answer all of this.
