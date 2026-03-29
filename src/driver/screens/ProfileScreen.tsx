@@ -1,57 +1,48 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Avatar, LoadingScreen } from '@/core/components';
 import { useAuthStore } from '@/core/stores/authStore';
 import { useChargingStats } from '@/core/queries/useProfile';
 import { useAuth } from '@/core/auth/useAuth';
 import { formatEGP, formatKWh } from '@/core/utils/formatCurrency';
 import { useTheme } from '@/core/theme';
+import { useTranslation } from '@/core/i18n';
 import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
-
-const LANG_STORAGE_KEY = 'ev_charge_lang';
 
 export function ProfileScreen({ navigation }: any) {
   const { colors, isDark, toggleTheme } = useTheme();
   const user = useAuthStore((s) => s.user);
   const { signOut } = useAuth();
   const { data: stats } = useChargingStats();
-  const [lang, setLang] = useState<'en' | 'ar'>('en');
-
-  useEffect(() => {
-    AsyncStorage.getItem(LANG_STORAGE_KEY).then((stored) => {
-      if (stored === 'ar' || stored === 'en') setLang(stored);
-    });
-  }, []);
+  const { t, lang, setLanguage, isRTL } = useTranslation();
 
   const toggleLang = async () => {
     const next = lang === 'en' ? 'ar' : 'en';
-    setLang(next);
-    await AsyncStorage.setItem(LANG_STORAGE_KEY, next);
+    await setLanguage(next);
   };
 
   if (!user) return <LoadingScreen />;
 
   const menuItems = [
-    { label: 'My Vehicles', icon: '🚗', screen: 'Vehicle' },
-    { label: 'Favorites', icon: '⭐', screen: 'Favorites' },
-    { label: 'Settings', icon: '⚙️', screen: 'Settings' },
+    { label: t('my_vehicles'), icon: '🚗', screen: 'Vehicle' },
+    { label: t('favorites'), icon: '⭐', screen: 'Favorites' },
+    { label: t('settings'), icon: '⚙️', screen: 'Settings' },
   ];
 
   const statItems = [
     {
-      label: 'Trips',
+      label: t('trips'),
       value: stats?.totalSessions?.toString() || '0',
       color: colors.primary,
     },
     {
-      label: 'kWh',
+      label: t('kwh'),
       value: stats ? formatKWh(stats.totalKwh) : '0',
       color: colors.primary,
     },
     {
-      label: 'Saved',
+      label: t('saved'),
       value: stats ? `${stats.co2SavedKg.toFixed(0)} kg` : '0',
       color: colors.secondary,
     },
@@ -147,7 +138,7 @@ export function ProfileScreen({ navigation }: any) {
         >
           <Text style={styles.menuIcon}>🌙</Text>
           <Text style={[styles.menuLabel, { color: colors.text }]}>
-            Dark Mode
+            {t('dark_mode')}
           </Text>
           <Switch
             value={isDark}
@@ -194,8 +185,8 @@ export function ProfileScreen({ navigation }: any) {
 
       {/* App info */}
       <View style={{ marginTop: 24, alignItems: 'center', paddingBottom: 32 }}>
-        <Text style={{ ...(typography.caption as object), color: colors.textTertiary }}>WattsOn v1.0.0</Text>
-        <Text style={{ ...(typography.small as object), color: colors.textTertiary, marginTop: 4 }}>Egypt's Smart EV Charging Platform</Text>
+        <Text style={{ ...(typography.caption as object), color: colors.textTertiary }}>{t('app_name')} {t('version')}</Text>
+        <Text style={{ ...(typography.small as object), color: colors.textTertiary, marginTop: 4 }}>{t('app_tagline')}</Text>
       </View>
 
       {/* Sign Out */}
@@ -210,7 +201,7 @@ export function ProfileScreen({ navigation }: any) {
         activeOpacity={0.7}
       >
         <Text style={[styles.logoutText, { color: colors.error }]}>
-          Sign Out
+          {t('sign_out')}
         </Text>
       </TouchableOpacity>
     </ScrollView>

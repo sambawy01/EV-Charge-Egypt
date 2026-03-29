@@ -4,12 +4,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Button } from '@/core/components';
 import { useTheme } from '@/core/theme';
 import { useAuthStore } from '@/core/stores/authStore';
+import { useTranslation } from '@/core/i18n';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
 export function WelcomeScreen({ navigation }: any) {
   const { colors } = useTheme();
   const { setUser } = useAuthStore();
+  const { t, isRTL } = useTranslation();
 
   const handleDemoMode = () => {
     setUser({
@@ -117,7 +119,7 @@ export function WelcomeScreen({ navigation }: any) {
         </Animated.View>
 
         {/* App name */}
-        <Text style={[styles.title, { color: colors.primary }]}>WattsOn</Text>
+        <Text style={[styles.title, { color: colors.primary }]}>{t('welcome_title')}</Text>
         <Text style={[styles.country, { color: colors.secondary }]}>Egypt</Text>
 
         {/* Gradient separator */}
@@ -129,8 +131,8 @@ export function WelcomeScreen({ navigation }: any) {
         />
 
         {/* Tagline */}
-        <Text style={[styles.tagline, { color: colors.textSecondary }]}>
-          Find, book & charge across all Egyptian{'\n'}EV providers. One app for everything.
+        <Text style={[styles.tagline, { color: colors.textSecondary, textAlign: isRTL ? 'right' : 'center' }]}>
+          {t('welcome_subtitle')}
         </Text>
 
         {/* Gradient separator */}
@@ -145,17 +147,17 @@ export function WelcomeScreen({ navigation }: any) {
         <View style={styles.statsRow}>
           <View style={styles.stat}>
             <Text style={[styles.statValue, { color: colors.primary }]}>100+</Text>
-            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Stations</Text>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{t('stations_in_egypt')}</Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.stat}>
             <Text style={[styles.statValue, { color: colors.primary }]}>12</Text>
-            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Providers</Text>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{t('verified')}</Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.stat}>
             <Text style={[styles.statValue, { color: colors.primary }]}>24/7</Text>
-            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Available</Text>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>{t('available')}</Text>
           </View>
         </View>
       </Animated.View>
@@ -163,19 +165,19 @@ export function WelcomeScreen({ navigation }: any) {
       {/* Bottom actions */}
       <Animated.View style={[styles.actions, { opacity: fadeIn }]}>
         <Button
-          title="Get Started"
+          title={t('get_started')}
           onPress={() => navigation.navigate('Register')}
           size="lg"
           style={styles.primaryButton}
         />
         <Button
-          title="I already have an account"
+          title={t('already_have_account')}
           onPress={() => navigation.navigate('Login')}
           variant="ghost"
         />
         <TouchableOpacity onPress={handleDemoMode} style={{ marginTop: 8, alignItems: 'center' }}>
           <Text style={{ ...typography.caption, color: colors.primary, textDecorationLine: 'underline' }}>
-            Explore Demo Mode
+            {t('explore_demo')}
           </Text>
         </TouchableOpacity>
       </Animated.View>

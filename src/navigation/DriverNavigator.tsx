@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useTheme } from '@/core/theme';
+import { useTranslation } from '@/core/i18n';
 import { aiContextService } from '@/core/services/aiContextService';
 import { useVehicles } from '@/core/queries/useVehicles';
 
@@ -231,6 +232,7 @@ function GlowTab({ icon, label, isFocused, onPress, colors }: {
 
 function InlineTabs({ state, descriptors, navigation }: any) {
   const { colors } = useTheme();
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
   const { data: vehicles } = useVehicles();
@@ -242,12 +244,12 @@ function InlineTabs({ state, descriptors, navigation }: any) {
   }, [vehicles]);
 
   const tabs = [
-    { name: 'MapTab', icon: '\u{1F4CD}', label: 'Map' },
-    { name: 'AITab', icon: '\u{1F916}', label: 'AI' },
-    { name: 'NewsTab', icon: '\u{1F4F0}', label: 'News' },
-    { name: 'WalletTab', icon: '\u{1F4B3}', label: 'Wallet' },
-    { name: 'VehicleTab', icon: '\u{1F697}', label: 'Vehicle' },
-    { name: 'ProfileTab', icon: '\u{1F464}', label: 'Profile' },
+    { name: 'MapTab', icon: '\u{1F4CD}', label: t('map') },
+    { name: 'AITab', icon: '\u{1F916}', label: t('ai') },
+    { name: 'NewsTab', icon: '\u{1F4F0}', label: t('news') },
+    { name: 'WalletTab', icon: '\u{1F4B3}', label: t('wallet') },
+    { name: 'VehicleTab', icon: '\u{1F697}', label: t('vehicle') },
+    { name: 'ProfileTab', icon: '\u{1F464}', label: t('profile') },
   ];
 
   // --- Mobile: simple bottom tab bar ---
