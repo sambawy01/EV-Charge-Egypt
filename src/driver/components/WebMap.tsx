@@ -211,20 +211,39 @@ function initMap(){
     if (openInfoWindow) { openInfoWindow.close(); openInfoWindow = null; }
   });
 
-  // User location marker
+  // User location marker — prominent pulsing blue dot with label
   if(userLoc){
+    // Outer pulsing ring (CSS animation via SVG)
+    var pulseIcon='<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48">' +
+      '<style>@keyframes pulse{0%{r:18;opacity:0.4}50%{r:22;opacity:0.1}100%{r:18;opacity:0.4}}.p{animation:pulse 2s infinite ease-in-out}</style>' +
+      '<circle class="p" cx="24" cy="24" r="20" fill="#00D4FF" opacity="0.3"/>' +
+      '<circle cx="24" cy="24" r="10" fill="#00D4FF" stroke="#FFFFFF" stroke-width="3"/>' +
+      '<circle cx="24" cy="24" r="4" fill="#FFFFFF"/>' +
+      '</svg>';
+    new google.maps.Marker({
+      position:userLoc,
+      map:map,
+      icon:{
+        url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(pulseIcon),
+        scaledSize:new google.maps.Size(48,48),
+        anchor:new google.maps.Point(24,24)
+      },
+      title:'You are here',
+      zIndex:999
+    });
+
+    // "You" label above the dot
     new google.maps.Marker({
       position:userLoc,
       map:map,
       icon:{
         url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(
-          '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><circle cx="12" cy="12" r="8" fill="#00D4FF" stroke="#FFFFFF" stroke-width="3" opacity="0.9"/></svg>'
+          '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="24"><rect x="0" y="0" width="40" height="20" rx="10" fill="#00D4FF"/><text x="20" y="14" text-anchor="middle" fill="#000" font-size="11" font-weight="bold" font-family="system-ui">You</text></svg>'
         ),
-        scaledSize:new google.maps.Size(24,24),
-        anchor:new google.maps.Point(12,12)
+        scaledSize:new google.maps.Size(40,24),
+        anchor:new google.maps.Point(20,40)
       },
-      title:'Your Location',
-      zIndex:999
+      zIndex:1000
     });
 
     new google.maps.Circle({
