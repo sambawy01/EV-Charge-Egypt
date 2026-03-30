@@ -27,24 +27,44 @@ interface AISpec {
 }
 
 async function aiLookupVehicle(brand: string, model: string): Promise<AISpec | null> {
-  // Simulate a short network delay for perceived "AI" feel
   await new Promise((r) => setTimeout(r, 800));
 
-  // Try fuzzy match in local database first
+  const lowerBrand = brand.toLowerCase().trim();
+  const lowerModel = model.toLowerCase().trim();
+
+  // Try exact match first
   const allMakes = getMakes();
+  const exactMake = allMakes.find((m) => m.toLowerCase() === lowerBrand);
+  if (exactMake) {
+    const models = getModelsForMake(exactMake);
+    const exactModel = models.find((m) => m.model.toLowerCase() === lowerModel);
+    if (exactModel) {
+      return {
+        batteryCapacityKwh: exactModel.batteryCapacityKwh,
+        rangeKm: exactModel.rangeKm,
+        connectorTypes: exactModel.connectorTypes,
+        maxChargingKw: exactModel.maxChargingKw,
+        year: exactModel.year,
+      };
+    }
+  }
+
+  // Fuzzy match — try partial matches on both brand and model
   const closeMake = allMakes.find(
     (m) =>
-      m.toLowerCase().includes(brand.toLowerCase()) ||
-      brand.toLowerCase().includes(m.toLowerCase()),
+      m.toLowerCase().includes(lowerBrand) ||
+      lowerBrand.includes(m.toLowerCase()),
   );
 
   if (closeMake) {
     const models = getModelsForMake(closeMake);
-    const closeModel = models.find(
-      (m) =>
-        m.model.toLowerCase().includes(model.toLowerCase()) ||
-        model.toLowerCase().includes(m.model.toLowerCase()),
-    );
+    // Try multiple fuzzy strategies
+    const closeModel = models.find((m) => {
+      const ml = m.model.toLowerCase();
+      return ml.includes(lowerModel) || lowerModel.includes(ml) ||
+        // Handle model variants: "x70" matches "X70 EV", "Model 3" matches "Model 3 Long Range"
+        ml.split(' ')[0] === lowerModel.split(' ')[0];
+    });
     if (closeModel) {
       return {
         batteryCapacityKwh: closeModel.batteryCapacityKwh,
@@ -52,6 +72,17 @@ async function aiLookupVehicle(brand: string, model: string): Promise<AISpec | n
         connectorTypes: closeModel.connectorTypes,
         maxChargingKw: closeModel.maxChargingKw,
         year: closeModel.year,
+      };
+    }
+    // If brand matches but model doesn't, use the first model from that brand as reference
+    if (models.length > 0) {
+      const ref = models[0];
+      return {
+        batteryCapacityKwh: ref.batteryCapacityKwh,
+        rangeKm: ref.rangeKm,
+        connectorTypes: ref.connectorTypes,
+        maxChargingKw: ref.maxChargingKw,
+        year: ref.year,
       };
     }
   }
@@ -82,9 +113,9 @@ async function aiLookupVehicle(brand: string, model: string): Promise<AISpec | n
     wuling: { battery: 31, range: 200, charging: 40, connectors: ['Type2', 'GBT'] },
   };
 
-  const lowerBrand = brand.toLowerCase();
+  const brandKey = brand.toLowerCase();
   const defaults =
-    Object.entries(brandDefaults).find(([k]) => lowerBrand.includes(k))?.[1] ||
+    Object.entries(brandDefaults).find(([k]) => brandKey.includes(k))?.[1] ||
     brandDefaults['default'];
 
   return {
