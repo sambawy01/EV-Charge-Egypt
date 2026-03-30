@@ -132,26 +132,51 @@ One account. One wallet. Every station in Egypt.
 
 The driver tops up their WattsOn wallet once (credit card, Fawry, Vodafone Cash, InstaPay) and can pay at ANY partner station — Infinity, Elsewedy, Sha7en, IKARUS, Electra — without downloading anything else.
 
-**How it works:**
+**How it works — Direct-to-Provider Payments:**
+
+WattsOn uses **PayMob** (Egypt's largest payment gateway, CBE-approved) with **split payments**. The money goes **directly into the provider's bank account** — WattsOn never holds provider funds.
 
 1. **Driver arrives at station** → WattsOn detects proximity
 2. **Selects charger** → sees connector type, power, and price per kWh
-3. **Taps "Start Charging"** → WattsOn initiates the session via provider's API
-4. **Charges their car** → real-time kWh counter in the app
-5. **Session ends** → WattsOn deducts from wallet, settles with provider
+3. **Taps "Start Charging"** → pays via card, Fawry, Vodafone Cash, or WattsOn wallet
+4. **PayMob processes payment** → automatically splits the amount in real-time
+5. **Provider receives 93%** directly in their bank account (next business day)
+6. **WattsOn receives 5%** commission — our service fee
+7. **PayMob retains 2%** — standard processing fee
+
+**This is NOT a wallet-to-wallet transfer.** It's a direct split at the payment processor level:
+
+```
+Driver pays 105 EGP
+       ↓
+   [PayMob Split Payment Engine]
+       ↓                ↓              ↓
+  Provider Bank    WattsOn Bank    PayMob Fee
+   97.65 EGP        5.25 EGP       2.10 EGP
+   (next day)       (next day)     (retained)
+```
+
+**Key point for providers:** Your money goes to YOUR bank account. Not ours. We never touch it. PayMob handles the split automatically with full Central Bank of Egypt compliance.
 
 **Revenue Model:**
 
-| Party | Per Session |
-|---|---|
-| Provider receives | 93% of charging fee |
-| WattsOn commission | 5% |
-| Payment processor | 2% |
+| Party | Per Session | Who Holds the Money |
+|---|---|---|
+| Provider | 93% of charging fee | Direct to provider's bank account |
+| WattsOn | 5% commission | Direct to WattsOn's bank account |
+| PayMob | 2% processing | Retained by PayMob |
 
 **Example:** A 30 kWh charge at 3.5 EGP/kWh = 105 EGP total
-- Provider gets: 97.65 EGP
-- WattsOn gets: 5.25 EGP
-- Payment processor: 2.10 EGP
+- Provider bank account: **+97.65 EGP** (next business day settlement)
+- WattsOn bank account: +5.25 EGP
+- PayMob processing: 2.10 EGP
+
+**Why direct-to-provider is critical:**
+- **No trust issue** — "WattsOn is holding our money" objection is eliminated
+- **No float risk** — provider gets paid on PayMob's standard T+1 settlement cycle
+- **No licensing burden** — WattsOn doesn't need a money transfer or e-wallet license from CBE
+- **Full transparency** — provider sees every transaction in their PayMob dashboard in real-time
+- **Instant reconciliation** — PayMob provides per-transaction reporting with station ID, connector, kWh, amount, commission deducted
 
 **Why providers should want this:**
 
@@ -171,19 +196,30 @@ The driver tops up their WattsOn wallet once (credit card, Fawry, Vodafone Cash,
 
    Most providers only support credit cards. WattsOn opens charging to the 60% of Egyptians who primarily use mobile money or cash-based payment.
 
-5. **Automated settlement.** Provider receives daily/weekly settlement reports with full breakdown: which station, which connector, kWh delivered, amount earned, commission deducted. Direct bank transfer, no invoicing hassle.
+5. **Direct bank settlement.** Money lands in the provider's own bank account next business day via PayMob's T+1 settlement. Full transaction-level reporting: which station, which connector, kWh delivered, driver ID (anonymized), amount earned, commission deducted. No invoicing, no manual reconciliation.
 
-6. **Fleet billing.** Fleet managers can set up company accounts with centralized billing. All their drivers charge on one account, one invoice. This is a feature most providers can't offer alone.
+6. **Fleet billing.** Fleet managers can set up company accounts with centralized billing. All their drivers charge on one account, one invoice. PayMob splits the fleet payment across multiple providers automatically. This is a feature no provider can offer alone.
+
+7. **No custody risk.** WattsOn never holds provider funds — not for a second. PayMob's split payment engine routes money directly at the transaction level. This means: no escrow, no float, no "where's my money" calls, no CBE licensing complications for either party.
 
 **For the Strategic Alliance tier:**
 
 Partners who integrate payment through WattsOn get:
 - 5% commission (vs 15-30% on other platforms) — we take less because we want adoption
-- First 6 months at 3% commission for founding partners
-- Real-time settlement dashboard
-- Dispute resolution handled by WattsOn
+- **First 6 months at 3% commission for founding partners**
+- Money goes directly to provider's bank account via PayMob split payments
+- Real-time transaction visibility in PayMob's merchant dashboard
+- Dispute resolution handled by WattsOn (we eat the cost of chargebacks)
 - Branded receipt: "Charged at [Provider Name] via WattsOn"
 - Tax-compliant invoicing for B2B/fleet customers
+- Monthly settlement report with full analytics
+
+**PayMob integration details:**
+- PayMob is Egypt's #1 payment gateway (CBE-licensed, PCI DSS Level 1)
+- Supports: Visa, Mastercard, Meeza, Fawry, Vodafone Cash, Orange Money, Etisalat Cash, InstaPay, Apple Pay, Google Pay
+- Split payment API handles multi-party settlement automatically
+- Provider onboarding: ~3 business days (KYC + bank account verification)
+- WattsOn handles the PayMob integration — provider just provides bank details
 
 **The bigger picture:**
 
