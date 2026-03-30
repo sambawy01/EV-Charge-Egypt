@@ -31,76 +31,27 @@ export const stationService = {
    * Primary path: fetch curated stations from Supabase (100+ verified).
    * Supplements with OpenChargeMap data merged in (deduped by name).
    */
+  // In-memory cache for Supabase stations — prevents re-fetching 435 stations on every render
+  _supabaseCache: null as { stations: Station[]; fetchedAt: number } | null,
+  _SUPABASE_CACHE_TTL: 5 * 60 * 1000, // 5 min cache
+
   async getStations(options: StationQueryOptions = {}): Promise<Station[]> {
     const { filter, latitude, longitude, radiusKm } = options;
 
     let stations: Station[];
 
     try {
-      // Supabase is the primary source — our curated, geocoded stations
-      stations = await this._getStationsFromSupabase();
-
-      // Optionally merge OCM stations that aren't already in Supabase
-      try {
-        let ocmStations: Station[];
-        if (isCacheFresh() && _ocmCache) {
-          ocmStations = _ocmCache.stations;
-        } else {
-          ocmStations = await fetchEgyptStations({ latitude, longitude, radiusKm });
-          _ocmCache = { stations: ocmStations, fetchedAt: Date.now() };
-        }
-        // Dedupe: only add OCM stations not already in Supabase (by name similarity)
-        const supabaseNames = new Set(stations.map((s) => s.name.toLowerCase()));
-        const newOcm = ocmStations.filter(
-          (s) => !supabaseNames.has(s.name.toLowerCase())
-        );
-        if (newOcm.length > 0) {
-          stations = [...stations, ...newOcm];
-        }
-      } catch (ocmErr) {
-        console.warn('[stationService] OCM merge skipped:', ocmErr);
+      // Use Supabase cache if fresh — avoids re-fetching 435 stations on every render
+      if (this._supabaseCache && Date.now() - this._supabaseCache.fetchedAt < this._SUPABASE_CACHE_TTL) {
+        stations = this._supabaseCache.stations;
+      } else {
+        stations = await this._getStationsFromSupabase();
+        this._supabaseCache = { stations, fetchedAt: Date.now() };
       }
 
-      // Also merge Google Maps EV stations
-      try {
-        const searchLat = latitude ?? 30.0444;
-        const searchLng = longitude ?? 31.2357;
-        const gmapStations = await googleMapsService.getEVStations(searchLat, searchLng, 50000);
-        if (gmapStations.length > 0) {
-          const existingNames = new Set(stations.map((s) => s.name.toLowerCase()));
-          const newGmap = gmapStations
-            .filter((g) => !existingNames.has(g.name.toLowerCase()))
-            .map((g) => ({
-              ...g,
-              provider_id: '',
-              external_station_id: g.id,
-              area: null,
-              amenities: [],
-              photos: [],
-              rating_avg: g.rating || 0,
-              review_count: 0,
-              is_active: true,
-              last_synced_at: null,
-              connectors: [],
-              status: 'available' as StationStatus,
-              city: null,
-            } as Station));
-          if (newGmap.length > 0) {
-            stations = [...stations, ...newGmap];
-          }
-        }
-      } catch (gmapErr) {
-        console.warn('[stationService] Google Maps merge skipped:', gmapErr);
-      }
     } catch (err) {
-      console.warn('[stationService] Supabase fetch failed, trying OCM:', err);
-      try {
-        stations = await fetchEgyptStations({ latitude, longitude, radiusKm });
-        _ocmCache = { stations, fetchedAt: Date.now() };
-      } catch (ocmErr) {
-        console.error('[stationService] Both sources failed:', ocmErr);
-        stations = [];
-      }
+      console.warn('[stationService] Supabase fetch failed:', err);
+      stations = [];
     }
 
     // Apply client-side filters
