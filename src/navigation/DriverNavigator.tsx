@@ -46,6 +46,13 @@ import { SettingsScreen } from '@/driver/screens/SettingsScreen';
 // Cost Calculator
 import { CostCalculatorScreen } from '@/driver/screens/CostCalculatorScreen';
 
+// Charging Statistics
+import { ChargingStatsScreen } from '@/driver/screens/ChargingStatsScreen';
+
+// Home Charger Sharing
+import { ListHomeChargerScreen } from '@/driver/screens/ListHomeChargerScreen';
+import { MyHomeChargersScreen } from '@/driver/screens/MyHomeChargersScreen';
+
 const Tab = createBottomTabNavigator();
 const MapStack = createNativeStackNavigator();
 const BookingsStack = createNativeStackNavigator();
@@ -64,6 +71,7 @@ function MapTabStack() {
       <MapStack.Screen name="ChargingSession" component={ChargingSessionScreen} />
       <MapStack.Screen name="BookingDetail" component={BookingDetailScreen} />
       <MapStack.Screen name="SubmitStation" component={SubmitStationScreen} />
+      <MapStack.Screen name="ListHomeCharger" component={ListHomeChargerScreen} />
     </MapStack.Navigator>
   );
 }
@@ -128,6 +136,9 @@ function ProfileTabStack() {
       <ProfileStack.Screen name="Favorites" component={FavoritesScreen} />
       <ProfileStack.Screen name="Settings" component={SettingsScreen} />
       <ProfileStack.Screen name="CostCalculator" component={CostCalculatorScreen} />
+      <ProfileStack.Screen name="ChargingStats" component={ChargingStatsScreen} />
+      <ProfileStack.Screen name="MyHomeChargers" component={MyHomeChargersScreen} />
+      <ProfileStack.Screen name="ListHomeCharger" component={ListHomeChargerScreen} />
     </ProfileStack.Navigator>
   );
 }

@@ -5,6 +5,7 @@ import { useStations } from '@/core/queries/useStations';
 import { useMapStore } from '@/core/stores/mapStore';
 import { locationService } from '@/core/services/locationService';
 import { reliabilityScoreService, ReliabilityScore } from '@/core/services/reliabilityScoreService';
+import { stationReportService } from '@/core/services/stationReportService';
 import { StationMarker } from '../components/StationMarker';
 import { StationBottomSheet } from '../components/StationBottomSheet';
 import { SearchBar } from '../components/SearchBar';
@@ -12,6 +13,7 @@ import { FilterModal, loadDefaultPreset } from '../components/FilterModal';
 import { LoadingScreen } from '@/core/components';
 import { DEFAULT_MAP_REGION } from '@/core/config/constants';
 import type { Station } from '@/core/types/station';
+import { homeChargerService, HomeCharger } from '@/core/services/homeChargerService';
 
 export function MapScreen({ navigation }: any) {
   const { region, searchQuery, filters, setRegion, setSearchQuery, setFilters } = useMapStore();
@@ -20,6 +22,7 @@ export function MapScreen({ navigation }: any) {
     null
   );
   const [reliabilityScores, setReliabilityScores] = useState<Map<string, ReliabilityScore>>(new Map());
+  const [stationPhotos, setStationPhotos] = useState<Map<string, { count: number; firstPhotoUrl: string | null }>>(new Map());
 
   // Get user location + load default filter preset on mount
   useEffect(() => {
@@ -41,13 +44,22 @@ export function MapScreen({ navigation }: any) {
     })();
   }, []);
 
-  // Fetch reliability scores on mount
+  // Fetch reliability scores + home chargers on mount
+  const [homeChargers, setHomeChargers] = useState<HomeCharger[]>([]);
   useEffect(() => {
     reliabilityScoreService.getAllScores().then(setReliabilityScores);
+    homeChargerService.listHomeChargers().then(setHomeChargers);
   }, []);
 
   // Pass user location to the station query for OCM proximity search
   const { data: stations, isLoading } = useStations(filters, userLocation);
+
+  // Fetch photo counts after stations load (non-blocking)
+  useEffect(() => {
+    if (!stations || stations.length === 0) return;
+    const ids = stations.map((s) => s.id);
+    stationReportService.getPhotoCountsForStations(ids).then(setStationPhotos).catch(() => {});
+  }, [stations]);
 
   // Stations already come sorted by distance from the service when location is provided
   const displayStations = (stations || []).map((s) => {
@@ -93,6 +105,16 @@ export function MapScreen({ navigation }: any) {
             />
           </Marker>
         ))}
+        {/* Home charger markers — green with house icon */}
+        {homeChargers.map((hc) => (
+          <Marker
+            key={`hc-${hc.id}`}
+            coordinate={{ latitude: hc.latitude, longitude: hc.longitude }}
+            title={hc.display_name}
+            description={`${hc.connector_type} ${hc.power_kw}kW ${hc.is_free ? '(Free)' : `(${hc.price_per_kwh} EGP/kWh)`}`}
+            pinColor="#00FF88"
+          />
+        ))}
       </MapView>
       <View style={styles.searchOverlay}>
         <SearchBar
@@ -106,6 +128,7 @@ export function MapScreen({ navigation }: any) {
           stations={displayStations.slice(0, 20)}
           onStationPress={handleStationPress}
           reliabilityScores={reliabilityScores}
+          stationPhotos={stationPhotos}
         />
       </View>
       <FilterModal

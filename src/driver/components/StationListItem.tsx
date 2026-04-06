@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, View, Text, Image, StyleSheet } from 'react-native';
 import { Card } from '@/core/components';
 import { Badge } from '@/core/components';
 import { ReliabilityBadge } from '@/core/components/ReliabilityBadge';
@@ -28,9 +28,11 @@ interface Props {
   station: Station;
   onPress: () => void;
   reliabilityScore?: ReliabilityScore | null;
+  photoUrl?: string;
+  photoCount?: number;
 }
 
-export function StationListItem({ station, onPress, reliabilityScore }: Props) {
+export function StationListItem({ station, onPress, reliabilityScore, photoUrl, photoCount }: Props) {
   const status = station.status || 'offline';
   const cheapest = station.connectors?.length
     ? Math.min(...station.connectors.map((c) => c.price_per_kwh))
@@ -67,6 +69,22 @@ export function StationListItem({ station, onPress, reliabilityScore }: Props) {
             {station.distance_km != null && (
               <Text style={styles.distance}>{station.distance_km.toFixed(1)} km</Text>
             )}
+            {photoUrl ? (
+              <View style={styles.thumbnailContainer}>
+                <Image
+                  source={{ uri: photoUrl }}
+                  style={styles.thumbnail}
+                  resizeMode="cover"
+                />
+                {(photoCount ?? 0) > 1 && (
+                  <View style={styles.photoBadge}>
+                    <Text style={styles.photoBadgeText}>
+                      {'\uD83D\uDCF7'} {photoCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ) : null}
           </View>
         </View>
       </Card>
@@ -85,4 +103,27 @@ const styles = StyleSheet.create({
   metaDot: { ...typography.small, color: colors.textTertiary, marginHorizontal: 4 },
   right: { alignItems: 'flex-end', gap: spacing.xs },
   distance: { ...typography.caption, color: colors.textSecondary, fontWeight: '600' },
+  thumbnailContainer: { position: 'relative' },
+  thumbnail: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  photoBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: colors.surface,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  photoBadgeText: {
+    fontSize: 8,
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
 });

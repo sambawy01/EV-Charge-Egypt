@@ -11,9 +11,10 @@ interface Props {
   stations: Station[];
   onStationPress: (station: Station) => void;
   reliabilityScores?: Map<string, ReliabilityScore>;
+  stationPhotos?: Map<string, { count: number; firstPhotoUrl: string | null }>;
 }
 
-export function StationBottomSheet({ stations, onStationPress, reliabilityScores }: Props) {
+export function StationBottomSheet({ stations, onStationPress, reliabilityScores, stationPhotos }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.handle} />
@@ -21,13 +22,18 @@ export function StationBottomSheet({ stations, onStationPress, reliabilityScores
       <FlatList
         data={stations}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <StationListItem
-            station={item}
-            onPress={() => onStationPress(item)}
-            reliabilityScore={reliabilityScores?.get(item.id)}
-          />
-        )}
+        renderItem={({ item }) => {
+          const photoData = stationPhotos?.get(item.id);
+          return (
+            <StationListItem
+              station={item}
+              onPress={() => onStationPress(item)}
+              reliabilityScore={reliabilityScores?.get(item.id)}
+              photoUrl={photoData?.firstPhotoUrl ?? undefined}
+              photoCount={photoData?.count}
+            />
+          );
+        }}
         contentContainerStyle={{ paddingBottom: spacing.xl }}
         showsVerticalScrollIndicator={false}
       />

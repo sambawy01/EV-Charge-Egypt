@@ -1,5 +1,7 @@
 import { supabase } from '../config/supabase';
 import { useAuthStore } from '../stores/authStore';
+import { badgeService } from './badgeService';
+import { useBadgeStore } from '../stores/badgeStore';
 
 export type StationStatus = 'available' | 'busy' | 'out_of_service' | 'partially_available' | 'iced';
 
@@ -159,10 +161,53 @@ export const stationReportService = {
       if (error) throw error;
       // Invalidate cache
       _reportCache = null;
+
+      // Check for badge unlocks (fire and forget — non-blocking)
+      if (effectiveUserId && effectiveUserId !== 'anonymous') {
+        badgeService.checkAndAwardBadges(effectiveUserId).then((newBadges) => {
+          if (newBadges.length > 0) {
+            useBadgeStore.getState().enqueueBadges(newBadges);
+          }
+        }).catch(() => {});
+      }
+
       return true;
     } catch (err) {
       console.warn('[stationReportService] Submit failed:', err);
       return false;
+    }
+  },
+
+  async getPhotoCountsForStations(
+    stationIds: string[],
+  ): Promise<Map<string, { count: number; firstPhotoUrl: string | null }>> {
+    const result = new Map<string, { count: number; firstPhotoUrl: string | null }>();
+    if (stationIds.length === 0) return result;
+
+    try {
+      const { data, error } = await supabase
+        .from('station_reports')
+        .select('station_id, photos')
+        .in('station_id', stationIds)
+        .not('photos', 'eq', '{}');
+      if (error) throw error;
+
+      // Aggregate: count total photos per station, keep first photo URL
+      for (const row of data || []) {
+        if (!row.photos || !Array.isArray(row.photos) || row.photos.length === 0) continue;
+        const existing = result.get(row.station_id);
+        if (existing) {
+          existing.count += row.photos.length;
+        } else {
+          result.set(row.station_id, {
+            count: row.photos.length,
+            firstPhotoUrl: row.photos[0] || null,
+          });
+        }
+      }
+      return result;
+    } catch {
+      return result;
     }
   },
 

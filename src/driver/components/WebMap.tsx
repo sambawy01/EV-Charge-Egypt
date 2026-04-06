@@ -1,9 +1,11 @@
 import React, { useEffect, useId, useMemo } from 'react';
 import { Platform } from 'react-native';
 import type { Station } from '@/core/types/station';
+import type { HomeCharger } from '@/core/services/homeChargerService';
 
 interface Props {
   stations: Station[];
+  homeChargers?: HomeCharger[];
   onStationPress?: (station: Station) => void;
   userLocation?: { latitude: number; longitude: number } | null;
 }
@@ -67,7 +69,8 @@ function computeInitialView(
 
 function buildMapHtml(
   stations: Station[],
-  userLocation?: { latitude: number; longitude: number } | null
+  userLocation?: { latitude: number; longitude: number } | null,
+  homeChargers?: HomeCharger[]
 ): string {
   const { lat, lng, zoom } = computeInitialView(stations, userLocation);
 
@@ -86,6 +89,22 @@ function buildMapHtml(
         .map((c) => c.type + ' ' + c.power_kw + 'kW')
         .join(', '),
       verified: (s as any).is_verified || false,
+    }))
+  );
+
+  const homeChargersJson = JSON.stringify(
+    (homeChargers || []).map((hc) => ({
+      id: hc.id,
+      name: hc.display_name,
+      address: hc.address,
+      latitude: hc.latitude,
+      longitude: hc.longitude,
+      connectorType: hc.connector_type,
+      powerKw: hc.power_kw,
+      schedule: hc.availability_schedule || '',
+      isFree: hc.is_free,
+      pricePerKwh: hc.price_per_kwh,
+      description: hc.description || '',
     }))
   );
 
@@ -120,6 +139,7 @@ html,body,#map{width:100%;height:100%;background:#0A0E1A}
 <div id="map"></div>
 <script>
 var stations=${markersJson};
+var homeChargers=${homeChargersJson};
 var userLoc=${userLocJson};
 
 var DARK_STYLE=[
@@ -287,6 +307,64 @@ function initMap(){
     });
   });
 
+  // Home charger markers — distinct green house icons
+  function createHomeChargerIcon(){
+    var svg='<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">' +
+      '<circle cx="16" cy="16" r="14" fill="#00FF88" stroke="#FFFFFF" stroke-width="2" opacity="0.9"/>' +
+      '<text x="16" y="21" text-anchor="middle" font-size="16" fill="#000">&#127968;</text>' +
+      '</svg>';
+    return {
+      url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg),
+      scaledSize:new google.maps.Size(32,32),
+      anchor:new google.maps.Point(16,16)
+    };
+  }
+
+  function createHomeChargerInfo(hc){
+    return '<div style="background:#141B2D;color:#F0F4FF;padding:14px;border-radius:12px;min-width:260px;max-width:300px;font-family:system-ui,-apple-system,sans-serif;">' +
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
+        '<span style="font-size:18px;">&#127968;</span>' +
+        '<span style="font-weight:700;font-size:15px;color:#F0F4FF;">' + hc.name + '</span>' +
+      '</div>' +
+      '<div style="font-size:12px;color:#8892B0;margin-bottom:6px;">' + hc.address + '</div>' +
+      '<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;">' +
+        '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#00D4FF;background:#00D4FF15;border:1px solid #00D4FF40;">' + hc.connectorType + '</span>' +
+        '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#00D4FF;background:#00D4FF15;border:1px solid #00D4FF40;">' + hc.powerKw + ' kW</span>' +
+        '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:' + (hc.isFree ? '#00FF88' : '#FFB020') + ';background:' + (hc.isFree ? '#00FF8815' : '#FFB02015') + ';border:1px solid ' + (hc.isFree ? '#00FF8840' : '#FFB02040') + ';">' + (hc.isFree ? 'Free' : hc.pricePerKwh + ' EGP/kWh') + '</span>' +
+      '</div>' +
+      (hc.schedule ? '<div style="font-size:11px;color:#8892B0;margin-bottom:6px;">&#128340; ' + hc.schedule + '</div>' : '') +
+      (hc.description ? '<div style="font-size:11px;color:#5A6482;margin-bottom:6px;">' + hc.description + '</div>' : '') +
+      '<div style="display:flex;gap:8px;">' +
+        '<a href="https://www.google.com/maps/dir/?api=1&destination=' + hc.latitude + ',' + hc.longitude + '&travelmode=driving" target="_blank" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#00FF88,#00D4FF);color:#000;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;">&#128205; Navigate</a>' +
+      '</div>' +
+    '</div>';
+  }
+
+  homeChargers.forEach(function(hc){
+    var marker=new google.maps.Marker({
+      position:{lat:hc.latitude,lng:hc.longitude},
+      map:map,
+      icon:createHomeChargerIcon(),
+      title:hc.name + ' (Home Charger)',
+      zIndex:15
+    });
+
+    var infoWindow=new google.maps.InfoWindow({
+      content:createHomeChargerInfo(hc),
+      maxWidth:300
+    });
+
+    marker.addListener('click',function(){
+      if(openInfoWindow) openInfoWindow.close();
+      infoWindow.open(map,marker);
+      openInfoWindow=infoWindow;
+    });
+
+    infoWindow.addListener('closeclick',function(){
+      openInfoWindow=null;
+    });
+  });
+
   // Fit bounds: user + nearest 5 stations
   if(userLoc && stations.length>0){
     var nearSorted=stations.slice().sort(function(a,b){
@@ -388,10 +466,10 @@ if(userLoc&&bounds.length>0){
 </html>`;
 }
 
-export function WebMap({ stations, onStationPress, userLocation }: Props) {
+export function WebMap({ stations, homeChargers, onStationPress, userLocation }: Props) {
   const containerId = 'ev-map-' + useId().replace(/:/g, '');
 
-  const html = useMemo(() => buildMapHtml(stations, userLocation), [stations, userLocation]);
+  const html = useMemo(() => buildMapHtml(stations, userLocation, homeChargers), [stations, userLocation, homeChargers]);
 
   useEffect(() => {
     if (Platform.OS !== 'web') return;

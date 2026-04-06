@@ -25,6 +25,7 @@ import { reliabilityScoreService, type ReliabilityScore } from '@/core/services/
 import { ReliabilityBadge } from '@/core/components/ReliabilityBadge';
 import { supabase } from '@/core/config/supabase';
 import { useVehicles } from '@/core/queries/useVehicles';
+import { homeChargerService, HomeCharger } from '@/core/services/homeChargerService';
 
 // ---------------------------------------------------------------------------
 // Hooks
@@ -128,11 +129,16 @@ export function MapScreen({ navigation }: any) {
   const { data: stations, isLoading } = useStations(filters, userLocation);
   const { data: vehicles } = useVehicles();
 
-  // Load default filter preset on mount
+  // Home chargers state
+  const [homeChargers, setHomeChargers] = useState<HomeCharger[]>([]);
+  const [showHomeChargers, setShowHomeChargers] = useState(true);
+
+  // Load default filter preset + home chargers on mount
   useEffect(() => {
     loadDefaultPreset().then((defaultFilter) => {
       if (defaultFilter) setFilters(defaultFilter);
     });
+    homeChargerService.listHomeChargers().then(setHomeChargers);
   }, []);
 
   // Listen for messages from the map iframe (station clicks + status reports)
@@ -224,11 +230,19 @@ export function MapScreen({ navigation }: any) {
   // Live community statuses
   const [liveStatuses, setLiveStatuses] = useState<Map<string, any>>(new Map());
   const [reliabilityScores, setReliabilityScores] = useState<Map<string, ReliabilityScore>>(new Map());
+  const [stationPhotos, setStationPhotos] = useState<Map<string, { count: number; firstPhotoUrl: string | null }>>(new Map());
 
   useEffect(() => {
     stationReportService.getAllLiveStatuses().then(setLiveStatuses);
     reliabilityScoreService.getAllScores().then(setReliabilityScores);
   }, []);
+
+  // Fetch photo counts after stations load (non-blocking)
+  useEffect(() => {
+    if (!stations || stations.length === 0) return;
+    const ids = stations.map((s: Station) => s.id);
+    stationReportService.getPhotoCountsForStations(ids).then(setStationPhotos).catch(() => {});
+  }, [stations]);
 
   // Subscribe to real-time status updates
   useEffect(() => {
@@ -258,7 +272,7 @@ export function MapScreen({ navigation }: any) {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         {/* Full screen map */}
         <View style={{ flex: 1 }}>
-          <WebMap stations={displayStations} onStationPress={handleStationPress} userLocation={userLocation} />
+          <WebMap stations={displayStations} homeChargers={showHomeChargers ? homeChargers : []} onStationPress={handleStationPress} userLocation={userLocation} />
         </View>
 
         {/* Search bar overlay at top */}
@@ -353,6 +367,17 @@ export function MapScreen({ navigation }: any) {
               <Text style={{ fontSize: 10 }}>{'\u2795'}</Text>
               <Text style={{ fontSize: 10, fontWeight: '600', color: colors.secondary }}>Add Station</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('ListHomeCharger')}
+              style={{
+                flexDirection: 'row', alignItems: 'center', gap: 4,
+                backgroundColor: '#00FF8815', borderWidth: 1, borderColor: '#00FF88',
+                borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4,
+              }}
+            >
+              <Text style={{ fontSize: 10 }}>{'\uD83C\uDFE0'}</Text>
+              <Text style={{ fontSize: 10, fontWeight: '600', color: '#00FF88' }}>Share Charger</Text>
+            </TouchableOpacity>
           </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {displayStations.slice(0, 5).map((station) => {
@@ -375,10 +400,38 @@ export function MapScreen({ navigation }: any) {
                     borderColor: colors.border,
                   }}
                 >
-                  {/* Status dot + label */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusColor }} />
-                    <Text style={{ fontSize: 10, fontWeight: '600', color: statusColor }}>{statusLabel}</Text>
+                  {/* Status dot + label + photo thumbnail */}
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: statusColor }} />
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: statusColor }}>{statusLabel}</Text>
+                      </View>
+                    </View>
+                    {(() => {
+                      const photoData = stationPhotos.get(station.id);
+                      if (!photoData?.firstPhotoUrl) return null;
+                      return (
+                        <View style={{ position: 'relative' }}>
+                          <img
+                            src={photoData.firstPhotoUrl}
+                            style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover' }}
+                          />
+                          {photoData.count > 1 && (
+                            <View style={{
+                              position: 'absolute', bottom: -3, right: -3,
+                              backgroundColor: colors.surface, borderRadius: 8,
+                              paddingHorizontal: 4, paddingVertical: 1,
+                              borderWidth: 1, borderColor: colors.border,
+                            }}>
+                              <Text style={{ fontSize: 7, color: colors.textSecondary, fontWeight: '600' }}>
+                                {'\uD83D\uDCF7'} {photoData.count}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })()}
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <Text style={{ ...typography.bodyBold, color: colors.text, fontSize: 13, flex: 1 }} numberOfLines={1}>{station.name}</Text>
@@ -574,6 +627,48 @@ export function MapScreen({ navigation }: any) {
           <Text style={{ fontSize: 12, fontWeight: '600', color: colors.secondary }}>Submit New Station</Text>
         </TouchableOpacity>
 
+        {/* Share Your Charger banner */}
+        <TouchableOpacity
+          onPress={() => navigation.navigate('ListHomeCharger')}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 8,
+            backgroundColor: '#00FF8810', borderWidth: 1, borderColor: '#00FF8830',
+            borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12,
+            marginHorizontal: 16, marginBottom: 8,
+          }}
+        >
+          <Text style={{ fontSize: 18 }}>{'\uD83C\uDFE0'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#00FF88' }}>Share Your Charger</Text>
+            <Text style={{ fontSize: 10, color: colors.textTertiary }}>List your home charger for other EV drivers</Text>
+          </View>
+          <Text style={{ fontSize: 14, color: '#00FF88' }}>{'\u203A'}</Text>
+        </TouchableOpacity>
+
+        {/* Home chargers toggle */}
+        {homeChargers.length > 0 && (
+          <TouchableOpacity
+            onPress={() => setShowHomeChargers(!showHomeChargers)}
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 6,
+              marginHorizontal: 16, marginBottom: 8,
+              paddingVertical: 6, paddingHorizontal: 10,
+              backgroundColor: showHomeChargers ? '#00FF8815' : colors.surfaceSecondary,
+              borderRadius: 8, borderWidth: 1,
+              borderColor: showHomeChargers ? '#00FF8840' : colors.border,
+            }}
+          >
+            <Text style={{ fontSize: 14 }}>{'\uD83C\uDFE0'}</Text>
+            <Text style={{ fontSize: 11, fontWeight: '600', color: showHomeChargers ? '#00FF88' : colors.textSecondary }}>
+              Home Chargers ({homeChargers.length})
+            </Text>
+            <View style={{
+              width: 8, height: 8, borderRadius: 4, marginLeft: 'auto',
+              backgroundColor: showHomeChargers ? '#00FF88' : colors.textTertiary,
+            }} />
+          </TouchableOpacity>
+        )}
+
         {/* Station list */}
         <ScrollView style={styles.stationList} showsVerticalScrollIndicator={false}>
           {filteredStations.length === 0 ? (
@@ -684,6 +779,32 @@ export function MapScreen({ navigation }: any) {
                     })()}
                   </View>
 
+                  {/* Photo thumbnail */}
+                  {(() => {
+                    const photoData = stationPhotos.get(station.id);
+                    if (!photoData?.firstPhotoUrl) return null;
+                    return (
+                      <View style={{ position: 'relative', marginLeft: 8, flexShrink: 0 }}>
+                        <img
+                          src={photoData.firstPhotoUrl}
+                          style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover' }}
+                        />
+                        {photoData.count > 1 && (
+                          <View style={{
+                            position: 'absolute', bottom: -3, right: -3,
+                            backgroundColor: colors.surface, borderRadius: 8,
+                            paddingHorizontal: 4, paddingVertical: 1,
+                            borderWidth: 1, borderColor: colors.border,
+                          }}>
+                            <Text style={{ fontSize: 7, color: colors.textSecondary, fontWeight: '600' }}>
+                              {'\uD83D\uDCF7'} {photoData.count}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })()}
+
                   {/* Distance + Navigate */}
                   <View style={{ alignItems: 'flex-end', gap: 6, marginLeft: 8 }}>
                     {station.distance_km != null && (
@@ -753,6 +874,7 @@ export function MapScreen({ navigation }: any) {
       <View style={styles.mapContainer}>
         <WebMap
           stations={filteredStations}
+          homeChargers={showHomeChargers ? homeChargers : []}
           onStationPress={handleStationPress}
           userLocation={userLocation}
         />

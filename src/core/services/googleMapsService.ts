@@ -120,6 +120,26 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 export const googleMapsService = {
+  /**
+   * Geocode an address string to lat/lng coordinates.
+   */
+  async geocode(address: string): Promise<{ lat: number; lng: number } | null> {
+    if (!GOOGLE_MAPS_KEY) return null;
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_KEY}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.status === 'OK' && data.results?.length > 0) {
+        const loc = data.results[0].geometry.location;
+        return { lat: loc.lat, lng: loc.lng };
+      }
+      return null;
+    } catch (err) {
+      console.warn('[googleMapsService] geocode failed:', err);
+      return null;
+    }
+  },
+
   async getDirections(origin: string, destination: string, waypoints?: string[]): Promise<DirectionsResult | null> {
     if (!GOOGLE_MAPS_KEY) {
       console.warn('[googleMapsService] No API key configured');

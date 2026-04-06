@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet } from 'react-native';
 import { Avatar, LoadingScreen } from '@/core/components';
 import { useAuthStore } from '@/core/stores/authStore';
@@ -9,6 +9,7 @@ import { useTheme } from '@/core/theme';
 import { useTranslation } from '@/core/i18n';
 import { spacing, borderRadius } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
+import { badgeService, type BadgeProgress } from '@/core/services/badgeService';
 
 export function ProfileScreen({ navigation }: any) {
   const { colors, isDark, toggleTheme } = useTheme();
@@ -17,6 +18,14 @@ export function ProfileScreen({ navigation }: any) {
   const { data: stats } = useChargingStats();
   const { t, lang, setLanguage, isRTL } = useTranslation();
 
+  const [badgeProgress, setBadgeProgress] = useState<BadgeProgress[]>([]);
+
+  useEffect(() => {
+    if (user?.id) {
+      badgeService.getBadgeProgress(user.id).then(setBadgeProgress).catch(() => {});
+    }
+  }, [user?.id]);
+
   const toggleLang = async () => {
     const next = lang === 'en' ? 'ar' : 'en';
     await setLanguage(next);
@@ -24,9 +33,13 @@ export function ProfileScreen({ navigation }: any) {
 
   if (!user) return <LoadingScreen />;
 
+  const earnedCount = badgeProgress.filter((bp) => !!bp.badge.unlockedAt).length;
+
   const menuItems = [
     { label: t('my_vehicles'), icon: '🚗', screen: 'Vehicle' },
+    { label: t('home_charger_my_chargers'), icon: '🏠', screen: 'MyHomeChargers' },
     { label: t('cost_calculator'), icon: '🧮', screen: 'CostCalculator' },
+    { label: t('charging_statistics'), icon: '📊', screen: 'ChargingStats' },
     { label: t('favorites'), icon: '⭐', screen: 'Favorites' },
     { label: t('settings'), icon: '⚙️', screen: 'Settings' },
   ];
@@ -46,6 +59,11 @@ export function ProfileScreen({ navigation }: any) {
       label: t('saved'),
       value: stats ? `${stats.co2SavedKg.toFixed(0)} kg` : '0',
       color: colors.secondary,
+    },
+    {
+      label: t('badges_label' as any) || 'Badges',
+      value: `${earnedCount}/10`,
+      color: colors.warning,
     },
   ];
 
@@ -100,6 +118,92 @@ export function ProfileScreen({ navigation }: any) {
             </Text>
           </View>
         ))}
+      </View>
+
+      {/* Badges Section */}
+      <View style={styles.badgesSection}>
+        <Text style={[styles.badgesSectionTitle, { color: colors.text }]}>
+          {t('badges_title' as any) || 'Badges'}
+        </Text>
+        <View style={styles.badgesGrid}>
+          {badgeProgress.map((bp) => {
+            const isUnlocked = !!bp.badge.unlockedAt;
+            const badgeName = t(bp.badge.nameKey as any) || bp.badge.name;
+            return (
+              <View
+                key={bp.badge.id}
+                style={[
+                  styles.badgeCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: isUnlocked ? colors.primary : colors.border,
+                    ...(isUnlocked
+                      ? {
+                          shadowColor: colors.primary,
+                          shadowOffset: { width: 0, height: 0 },
+                          shadowOpacity: 0.35,
+                          shadowRadius: 10,
+                          elevation: 6,
+                        }
+                      : {}),
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgeIcon,
+                    { opacity: isUnlocked ? 1 : 0.3 },
+                  ]}
+                >
+                  {bp.badge.icon}
+                </Text>
+                <Text
+                  style={[
+                    styles.badgeName,
+                    {
+                      color: isUnlocked ? colors.text : colors.textTertiary,
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {badgeName}
+                </Text>
+                {isUnlocked ? (
+                  <Text style={[styles.badgeDate, { color: colors.primary }]}>
+                    {new Date(bp.badge.unlockedAt!).toLocaleDateString()}
+                  </Text>
+                ) : (
+                  <View style={styles.progressBarContainer}>
+                    <View
+                      style={[
+                        styles.progressBarBg,
+                        { backgroundColor: colors.surfaceTertiary },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.progressBarFill,
+                          {
+                            backgroundColor: colors.primary,
+                            width: `${bp.percentage}%`,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.progressText,
+                        { color: colors.textTertiary },
+                      ]}
+                    >
+                      {bp.current}/{bp.target}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
       </View>
 
       {/* Menu Items */}
@@ -254,6 +358,62 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.8,
+  },
+  badgesSection: {
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.xl,
+  },
+  badgesSectionTitle: {
+    ...(typography.h3 as object),
+    marginBottom: spacing.md,
+  },
+  badgesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  badgeCard: {
+    width: '31%' as any,
+    minWidth: 95,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xs,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+  },
+  badgeIcon: {
+    fontSize: 32,
+    marginBottom: spacing.xs,
+  },
+  badgeName: {
+    ...(typography.small as object),
+    fontWeight: '600' as const,
+    textAlign: 'center' as const,
+    marginBottom: spacing.xs,
+  },
+  badgeDate: {
+    ...(typography.small as object),
+    fontSize: 9,
+  },
+  progressBarContainer: {
+    width: '100%',
+    alignItems: 'center' as const,
+    paddingHorizontal: spacing.xs,
+  },
+  progressBarBg: {
+    width: '100%',
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden' as const,
+    marginBottom: 2,
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 2,
+  },
+  progressText: {
+    ...(typography.small as object),
+    fontSize: 9,
   },
   menu: {
     paddingHorizontal: spacing.md,

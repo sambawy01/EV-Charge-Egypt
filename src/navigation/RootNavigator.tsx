@@ -2,7 +2,9 @@ import React from 'react';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { useTheme } from '@/core/theme';
 import { useAuthStore } from '@/core/stores/authStore';
+import { useBadgeStore } from '@/core/stores/badgeStore';
 import { LoadingScreen } from '@/core/components';
+import { BadgeUnlockModal } from '@/core/components/BadgeUnlockModal';
 import { AuthNavigator } from './AuthNavigator';
 import { DriverNavigator } from './DriverNavigator';
 import { FleetNavigator } from './FleetNavigator';
@@ -10,6 +12,7 @@ import { FleetNavigator } from './FleetNavigator';
 export function RootNavigator() {
   const { isAuthenticated, isLoading, user } = useAuthStore();
   const { colors, isDark } = useTheme();
+  const { currentBadge, dismiss } = useBadgeStore();
 
   const navTheme = {
     ...(isDark ? DarkTheme : DefaultTheme),
@@ -29,14 +32,21 @@ export function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navTheme}>
-      {!isAuthenticated ? (
-        <AuthNavigator />
-      ) : user?.role === 'fleet_manager' ? (
-        <FleetNavigator />
-      ) : (
-        <DriverNavigator />
-      )}
-    </NavigationContainer>
+    <>
+      <NavigationContainer theme={navTheme}>
+        {!isAuthenticated ? (
+          <AuthNavigator />
+        ) : user?.role === 'fleet_manager' ? (
+          <FleetNavigator />
+        ) : (
+          <DriverNavigator />
+        )}
+      </NavigationContainer>
+      <BadgeUnlockModal
+        badge={currentBadge}
+        visible={!!currentBadge}
+        onDismiss={dismiss}
+      />
+    </>
   );
 }

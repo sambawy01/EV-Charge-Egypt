@@ -1,4 +1,6 @@
 import { supabase } from '../config/supabase';
+import { badgeService } from './badgeService';
+import { useBadgeStore } from '../stores/badgeStore';
 
 export interface SubmittedStation {
   id: string;
@@ -48,6 +50,16 @@ export const submittedStationService = {
         notes: station.notes || null,
       });
       if (error) throw error;
+
+      // Check for badge unlocks after station submission
+      if (station.submittedBy) {
+        badgeService.checkAndAwardBadges(station.submittedBy).then((newBadges) => {
+          if (newBadges.length > 0) {
+            useBadgeStore.getState().enqueueBadges(newBadges);
+          }
+        }).catch(() => {});
+      }
+
       return true;
     } catch (err) {
       console.warn('[submittedStationService] Submit failed:', err);
@@ -116,6 +128,13 @@ export const submittedStationService = {
           provider_id: '11111111-0000-0000-0000-000000000005',
         });
       }
+
+      // Check for badge unlocks after verification
+      badgeService.checkAndAwardBadges(userId).then((newBadges) => {
+        if (newBadges.length > 0) {
+          useBadgeStore.getState().enqueueBadges(newBadges);
+        }
+      }).catch(() => {});
 
       return true;
     } catch (err) {
