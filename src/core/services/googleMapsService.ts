@@ -1,5 +1,6 @@
 const GOOGLE_MAPS_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_KEY || '';
 const DIRECTIONS_BASE = 'https://maps.googleapis.com/maps/api/directions/json';
+const ELEVATION_BASE = 'https://maps.googleapis.com/maps/api/elevation/json';
 const PLACES_BASE = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
 const AUTOCOMPLETE_BASE = 'https://maps.googleapis.com/maps/api/place/autocomplete/json';
 
@@ -37,6 +38,21 @@ export interface NearbyPlace {
   rating?: number;
   lat: number;
   lng: number;
+}
+
+export interface ElevationPoint {
+  lat: number;
+  lng: number;
+  elevation: number; // metres above sea level
+  distanceFromStartKm: number;
+}
+
+export interface ElevationProfile {
+  points: ElevationPoint[];
+  totalAscent: number;  // metres
+  totalDescent: number; // metres
+  minElevation: number;
+  maxElevation: number;
 }
 
 function getPlaceIcon(types: string[]): { icon: string; type: string } {
@@ -104,14 +120,18 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
 }
 
 export const googleMapsService = {
-  async getDirections(origin: string, destination: string): Promise<DirectionsResult | null> {
+  async getDirections(origin: string, destination: string, waypoints?: string[]): Promise<DirectionsResult | null> {
     if (!GOOGLE_MAPS_KEY) {
       console.warn('[googleMapsService] No API key configured');
       return null;
     }
 
     try {
-      const url = `${DIRECTIONS_BASE}?origin=${encodeURIComponent(origin + ', Egypt')}&destination=${encodeURIComponent(destination + ', Egypt')}&key=${GOOGLE_MAPS_KEY}`;
+      let url = `${DIRECTIONS_BASE}?origin=${encodeURIComponent(origin + ', Egypt')}&destination=${encodeURIComponent(destination + ', Egypt')}&key=${GOOGLE_MAPS_KEY}`;
+      if (waypoints && waypoints.length > 0) {
+        const waypointStr = waypoints.map(wp => encodeURIComponent(wp + ', Egypt')).join('|');
+        url += `&waypoints=${waypointStr}`;
+      }
       const response = await fetch(url);
       const data = await response.json();
 
@@ -241,6 +261,62 @@ export const googleMapsService = {
     }
 
     return localMatches;
+  },
+
+  // Fetch elevation profile along an encoded polyline
+  async getElevationProfile(
+    encodedPolyline: string,
+    totalDistanceKm: number,
+  ): Promise<ElevationProfile | null> {
+    if (!GOOGLE_MAPS_KEY || !encodedPolyline) return null;
+
+    try {
+      // Sample roughly every 10km, minimum 5 points, maximum 100
+      const samples = Math.max(5, Math.min(100, Math.round(totalDistanceKm / 10)));
+      const url = `${ELEVATION_BASE}?path=enc:${encodedPolyline}&samples=${samples}&key=${GOOGLE_MAPS_KEY}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status !== 'OK' || !data.results?.length) {
+        console.warn('[googleMapsService] Elevation API error:', data.status);
+        return null;
+      }
+
+      let totalAscent = 0;
+      let totalDescent = 0;
+      let minElevation = Infinity;
+      let maxElevation = -Infinity;
+
+      const points: ElevationPoint[] = data.results.map((r: any, i: number) => {
+        const elev = Math.round(r.elevation);
+        if (elev < minElevation) minElevation = elev;
+        if (elev > maxElevation) maxElevation = elev;
+
+        if (i > 0) {
+          const diff = elev - Math.round(data.results[i - 1].elevation);
+          if (diff > 0) totalAscent += diff;
+          else totalDescent += Math.abs(diff);
+        }
+
+        return {
+          lat: r.location.lat,
+          lng: r.location.lng,
+          elevation: elev,
+          distanceFromStartKm: Math.round((i / (data.results.length - 1)) * totalDistanceKm),
+        };
+      });
+
+      return {
+        points,
+        totalAscent: Math.round(totalAscent),
+        totalDescent: Math.round(totalDescent),
+        minElevation: Math.round(minElevation),
+        maxElevation: Math.round(maxElevation),
+      };
+    } catch (err) {
+      console.error('[googleMapsService] Elevation fetch failed:', err);
+      return null;
+    }
   },
 
   // Find stations from our database that are near the route

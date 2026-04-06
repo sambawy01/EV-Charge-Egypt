@@ -5,13 +5,15 @@ import { colors } from '@/core/theme/colors';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 import type { Station } from '@/core/types/station';
+import type { ReliabilityScore } from '@/core/services/reliabilityScoreService';
 
 interface Props {
   stations: Station[];
   onStationPress: (station: Station) => void;
+  reliabilityScores?: Map<string, ReliabilityScore>;
 }
 
-export function StationBottomSheet({ stations, onStationPress }: Props) {
+export function StationBottomSheet({ stations, onStationPress, reliabilityScores }: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.handle} />
@@ -20,7 +22,11 @@ export function StationBottomSheet({ stations, onStationPress }: Props) {
         data={stations}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <StationListItem station={item} onPress={() => onStationPress(item)} />
+          <StationListItem
+            station={item}
+            onPress={() => onStationPress(item)}
+            reliabilityScore={reliabilityScores?.get(item.id)}
+          />
         )}
         contentContainerStyle={{ paddingBottom: spacing.xl }}
         showsVerticalScrollIndicator={false}

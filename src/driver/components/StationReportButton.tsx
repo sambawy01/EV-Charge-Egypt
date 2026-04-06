@@ -47,6 +47,7 @@ export function StationReportButton({
     { status: 'partially_available', label: 'Partially Available', icon: '\uD83D\uDFE1', color: colors.statusPartial },
     { status: 'busy', label: 'All Busy', icon: '\uD83D\uDD34', color: colors.statusOccupied },
     { status: 'out_of_service', label: 'Out of Service', icon: '\u26A0\uFE0F', color: colors.error },
+    { status: 'iced', label: 'ICE\'d / Blocked', icon: '\uD83D\uDE97', color: colors.warning },
   ];
 
   const handleReport = async (status: StationStatus) => {
@@ -100,7 +101,9 @@ export function StationReportButton({
         ? colors.statusPartial
         : liveStatus.status === 'busy'
           ? colors.statusOccupied
-          : colors.error
+          : liveStatus.status === 'iced'
+            ? colors.warning
+            : colors.error
     : colors.textTertiary;
 
   const confidenceLabel =
@@ -147,7 +150,9 @@ export function StationReportButton({
                     ? 'Partially Available'
                     : liveStatus.status === 'busy'
                       ? 'All Busy'
-                      : 'Out of Service'}
+                      : liveStatus.status === 'iced'
+                        ? 'ICE\'d / Blocked'
+                        : 'Out of Service'}
               </Text>
             </View>
             <View

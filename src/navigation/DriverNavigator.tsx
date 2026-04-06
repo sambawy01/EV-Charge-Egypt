@@ -43,6 +43,9 @@ import { AddVehicleScreen } from '@/driver/screens/AddVehicleScreen';
 import { FavoritesScreen } from '@/driver/screens/FavoritesScreen';
 import { SettingsScreen } from '@/driver/screens/SettingsScreen';
 
+// Cost Calculator
+import { CostCalculatorScreen } from '@/driver/screens/CostCalculatorScreen';
+
 const Tab = createBottomTabNavigator();
 const MapStack = createNativeStackNavigator();
 const BookingsStack = createNativeStackNavigator();
@@ -92,6 +95,7 @@ function AITabStack() {
       <AIStack.Screen name="AIAssistant" component={AIAssistantScreen} />
       <AIStack.Screen name="RouteResult" component={RouteResultScreen} />
       <AIStack.Screen name="CostReport" component={CostReportScreen} />
+      <AIStack.Screen name="CostCalculator" component={CostCalculatorScreen} />
     </AIStack.Navigator>
   );
 }
@@ -123,6 +127,7 @@ function ProfileTabStack() {
       <ProfileStack.Screen name="AddVehicle" component={AddVehicleScreen} />
       <ProfileStack.Screen name="Favorites" component={FavoritesScreen} />
       <ProfileStack.Screen name="Settings" component={SettingsScreen} />
+      <ProfileStack.Screen name="CostCalculator" component={CostCalculatorScreen} />
     </ProfileStack.Navigator>
   );
 }

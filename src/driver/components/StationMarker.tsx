@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/core/theme';
+import { ReliabilityBadge } from '@/core/components/ReliabilityBadge';
 import type { StationStatus } from '@/core/types/station';
+import type { ReliabilityScore } from '@/core/services/reliabilityScoreService';
 
 const PROVIDER_INITIALS: Record<string, string> = {
   ikarus: 'IK',
@@ -14,10 +16,11 @@ const PROVIDER_INITIALS: Record<string, string> = {
 interface Props {
   status: StationStatus;
   providerSlug: string;
+  reliabilityScore?: ReliabilityScore | null;
   testID?: string;
 }
 
-export function StationMarker({ status, providerSlug, testID }: Props) {
+export function StationMarker({ status, providerSlug, reliabilityScore, testID }: Props) {
   const { colors } = useTheme();
   const STATUS_COLORS: Record<StationStatus, string> = {
     available: colors.statusAvailable,
@@ -32,6 +35,7 @@ export function StationMarker({ status, providerSlug, testID }: Props) {
     <View testID={testID} style={[styles.container, { backgroundColor: bg, borderColor: colors.white, shadowColor: colors.black }]}>
       <Text style={[styles.text, { color: colors.white }]}>{initials}</Text>
       <View style={[styles.arrow, { borderTopColor: bg }]} />
+      {reliabilityScore && <ReliabilityBadge score={reliabilityScore} compact />}
     </View>
   );
 }

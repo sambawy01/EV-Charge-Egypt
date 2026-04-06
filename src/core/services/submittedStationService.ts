@@ -11,6 +11,7 @@ export interface SubmittedStation {
   provider_name: string | null;
   connector_types: string[];
   power_kw: number | null;
+  operating_hours: string | null;
   notes: string | null;
   status: 'pending' | 'verified' | 'rejected';
   verification_count: number;
@@ -28,6 +29,7 @@ export const submittedStationService = {
     providerName?: string;
     connectorTypes?: string[];
     powerKw?: number;
+    operatingHours?: string;
     notes?: string;
     submittedBy?: string;
   }): Promise<boolean> {
@@ -42,6 +44,7 @@ export const submittedStationService = {
         provider_name: station.providerName || null,
         connector_types: station.connectorTypes || [],
         power_kw: station.powerKw || null,
+        operating_hours: station.operatingHours || null,
         notes: station.notes || null,
       });
       if (error) throw error;

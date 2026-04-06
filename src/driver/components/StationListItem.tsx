@@ -2,11 +2,13 @@ import React from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { Card } from '@/core/components';
 import { Badge } from '@/core/components';
+import { ReliabilityBadge } from '@/core/components/ReliabilityBadge';
 import { colors } from '@/core/theme/colors';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 import { formatPricePerKWh } from '@/core/utils/formatCurrency';
 import type { Station, StationStatus } from '@/core/types/station';
+import type { ReliabilityScore } from '@/core/services/reliabilityScoreService';
 
 const STATUS_LABELS: Record<StationStatus, string> = {
   available: 'Available',
@@ -25,9 +27,10 @@ const STATUS_COLORS: Record<StationStatus, string> = {
 interface Props {
   station: Station;
   onPress: () => void;
+  reliabilityScore?: ReliabilityScore | null;
 }
 
-export function StationListItem({ station, onPress }: Props) {
+export function StationListItem({ station, onPress, reliabilityScore }: Props) {
   const status = station.status || 'offline';
   const cheapest = station.connectors?.length
     ? Math.min(...station.connectors.map((c) => c.price_per_kwh))
@@ -60,6 +63,7 @@ export function StationListItem({ station, onPress }: Props) {
               label={STATUS_LABELS[status]}
               backgroundColor={STATUS_COLORS[status]}
             />
+            {reliabilityScore && <ReliabilityBadge score={reliabilityScore} />}
             {station.distance_km != null && (
               <Text style={styles.distance}>{station.distance_km.toFixed(1)} km</Text>
             )}

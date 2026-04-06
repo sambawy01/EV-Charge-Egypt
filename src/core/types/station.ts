@@ -27,6 +27,7 @@ export interface Station {
   review_count: number;
   is_active: boolean;
   last_synced_at: string | null;
+  operating_hours?: string | null;
   connectors?: Connector[];
   status?: StationStatus;
   distance_km?: number;

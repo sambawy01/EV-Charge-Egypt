@@ -13,6 +13,7 @@ export function useRoutePlanner() {
       currentBatteryPct: number;
       vehicleId: string;
       origin: { lat: number; lng: number };
+      waypoints?: string[];
     }) => {
       const route = await aiService.planRoute({ ...input, userId: userId! });
       setLastRoute(route);

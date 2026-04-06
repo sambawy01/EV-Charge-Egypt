@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, Animated, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, TextInput, Image, ScrollView, Alert, Platform } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '@/core/theme';
 import { typography } from '@/core/theme/typography';
 import { stationReportService, StationStatus } from '@/core/services/stationReportService';
@@ -31,6 +32,8 @@ export function ProximityReporter({ stations, userLocation }: Props) {
   const [dismissedRatings, setDismissedRatings] = useState<Set<string>>(new Set());
   const [spots, setSpots] = useState('');
   const [userRating, setUserRating] = useState(0);
+  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const slideAnim = useRef(new Animated.Value(300)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -89,14 +92,68 @@ export function ProximityReporter({ stations, userLocation }: Props) {
     nearbyRef.current = currentlyNear;
   }, [userLocation, stations, dismissedStations, dismissedRatings]);
 
+  const pickPhotos = async () => {
+    if (selectedPhotos.length >= 3) {
+      Alert.alert('Limit reached', 'You can attach up to 3 photos per report.');
+      return;
+    }
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow photo access to attach images.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      selectionLimit: 3 - selectedPhotos.length,
+      quality: 0.7,
+    });
+
+    if (!result.canceled && result.assets) {
+      const newUris = result.assets.map(a => a.uri);
+      setSelectedPhotos(prev => [...prev, ...newUris].slice(0, 3));
+    }
+  };
+
+  const takePhoto = async () => {
+    if (selectedPhotos.length >= 3) {
+      Alert.alert('Limit reached', 'You can attach up to 3 photos per report.');
+      return;
+    }
+
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow camera access to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.7,
+    });
+
+    if (!result.canceled && result.assets?.[0]) {
+      setSelectedPhotos(prev => [...prev, result.assets[0].uri].slice(0, 3));
+    }
+  };
+
+  const removePhoto = (index: number) => {
+    setSelectedPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleReport = async (status: StationStatus) => {
     if (!popupStation) return;
+    setUploading(true);
     await stationReportService.submitReport({
       stationId: popupStation.id,
       userId: user?.id,
       status,
       availableSpots: spots ? parseInt(spots, 10) : undefined,
+      photos: selectedPhotos.length > 0 ? selectedPhotos : undefined,
     });
+    setUploading(false);
+    setSelectedPhotos([]);
     setPopupMode('thanks');
     setTimeout(() => {
       setShowPopup(false);
@@ -258,7 +315,7 @@ export function ProximityReporter({ stations, userLocation }: Props) {
                 <Text style={{ ...typography.caption, color: colors.statusPartial, fontWeight: '700' }}>Some Free</Text>
               </TouchableOpacity>
             </View>
-            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
               <TouchableOpacity onPress={() => handleReport('busy')} style={{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: colors.statusOccupied + '15', borderWidth: 1.5, borderColor: colors.statusOccupied }}>
                 <Text style={{ fontSize: 24, marginBottom: 4 }}>{'\uD83D\uDD34'}</Text>
                 <Text style={{ ...typography.caption, color: colors.statusOccupied, fontWeight: '700' }}>All Busy</Text>
@@ -266,6 +323,12 @@ export function ProximityReporter({ stations, userLocation }: Props) {
               <TouchableOpacity onPress={() => handleReport('out_of_service')} style={{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: colors.error + '15', borderWidth: 1.5, borderColor: colors.error }}>
                 <Text style={{ fontSize: 24, marginBottom: 4 }}>{'\u26A0\uFE0F'}</Text>
                 <Text style={{ ...typography.caption, color: colors.error, fontWeight: '700' }}>Broken</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+              <TouchableOpacity onPress={() => handleReport('iced')} style={{ flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', backgroundColor: colors.warning + '15', borderWidth: 1.5, borderColor: colors.warning }}>
+                <Text style={{ fontSize: 24, marginBottom: 4 }}>{'\uD83D\uDE97'}</Text>
+                <Text style={{ ...typography.caption, color: colors.warning, fontWeight: '700' }}>ICE'd / Blocked</Text>
               </TouchableOpacity>
             </View>
 
@@ -276,6 +339,82 @@ export function ProximityReporter({ stations, userLocation }: Props) {
               <TouchableOpacity onPress={handleDismiss}>
                 <Text style={{ ...typography.caption, color: colors.textTertiary }}>Skip</Text>
               </TouchableOpacity>
+            </View>
+
+            {/* Photo attach section */}
+            <View style={{ marginTop: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <TouchableOpacity
+                  onPress={pickPhotos}
+                  disabled={selectedPhotos.length >= 3 || uploading}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 6,
+                    paddingHorizontal: 12, paddingVertical: 8,
+                    backgroundColor: colors.primary + '15',
+                    borderRadius: 10, borderWidth: 1, borderColor: colors.primary + '30',
+                    opacity: selectedPhotos.length >= 3 ? 0.4 : 1,
+                  }}
+                >
+                  <Text style={{ fontSize: 14 }}>{'\uD83D\uDDBC\uFE0F'}</Text>
+                  <Text style={{ ...typography.caption, color: colors.primary, fontWeight: '600' }}>Gallery</Text>
+                </TouchableOpacity>
+
+                {Platform.OS !== 'web' && (
+                  <TouchableOpacity
+                    onPress={takePhoto}
+                    disabled={selectedPhotos.length >= 3 || uploading}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 6,
+                      paddingHorizontal: 12, paddingVertical: 8,
+                      backgroundColor: colors.primary + '15',
+                      borderRadius: 10, borderWidth: 1, borderColor: colors.primary + '30',
+                      opacity: selectedPhotos.length >= 3 ? 0.4 : 1,
+                    }}
+                  >
+                    <Text style={{ fontSize: 14 }}>{'\uD83D\uDCF7'}</Text>
+                    <Text style={{ ...typography.caption, color: colors.primary, fontWeight: '600' }}>Camera</Text>
+                  </TouchableOpacity>
+                )}
+
+                <Text style={{ ...typography.small, color: colors.textTertiary, marginLeft: 'auto' }}>
+                  {selectedPhotos.length}/3
+                </Text>
+              </View>
+
+              {/* Photo thumbnails */}
+              {selectedPhotos.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {selectedPhotos.map((uri, index) => (
+                      <View key={index} style={{ position: 'relative' }}>
+                        <Image
+                          source={{ uri }}
+                          style={{
+                            width: 64, height: 64, borderRadius: 10,
+                            borderWidth: 1.5, borderColor: colors.primary + '40',
+                          }}
+                        />
+                        <TouchableOpacity
+                          onPress={() => removePhoto(index)}
+                          style={{
+                            position: 'absolute', top: -6, right: -6,
+                            width: 20, height: 20, borderRadius: 10,
+                            backgroundColor: colors.error, alignItems: 'center', justifyContent: 'center',
+                          }}
+                        >
+                          <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700', lineHeight: 14 }}>{'\u2715'}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              )}
+
+              {uploading && (
+                <Text style={{ ...typography.small, color: colors.primary, marginTop: 6, textAlign: 'center' }}>
+                  Uploading photos...
+                </Text>
+              )}
             </View>
           </>
         )}

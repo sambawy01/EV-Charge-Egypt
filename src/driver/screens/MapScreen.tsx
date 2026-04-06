@@ -4,10 +4,11 @@ import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useStations } from '@/core/queries/useStations';
 import { useMapStore } from '@/core/stores/mapStore';
 import { locationService } from '@/core/services/locationService';
+import { reliabilityScoreService, ReliabilityScore } from '@/core/services/reliabilityScoreService';
 import { StationMarker } from '../components/StationMarker';
 import { StationBottomSheet } from '../components/StationBottomSheet';
 import { SearchBar } from '../components/SearchBar';
-import { FilterModal } from '../components/FilterModal';
+import { FilterModal, loadDefaultPreset } from '../components/FilterModal';
 import { LoadingScreen } from '@/core/components';
 import { DEFAULT_MAP_REGION } from '@/core/config/constants';
 import type { Station } from '@/core/types/station';
@@ -18,17 +19,31 @@ export function MapScreen({ navigation }: any) {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(
     null
   );
+  const [reliabilityScores, setReliabilityScores] = useState<Map<string, ReliabilityScore>>(new Map());
 
-  // Get user location on mount
+  // Get user location + load default filter preset on mount
   useEffect(() => {
     (async () => {
-      const granted = await locationService.requestPermission();
-      if (granted) {
-        const loc = await locationService.getCurrentLocation();
-        setUserLocation(loc);
-        setRegion({ ...DEFAULT_MAP_REGION, latitude: loc.latitude, longitude: loc.longitude });
+      const [, defaultFilter] = await Promise.all([
+        (async () => {
+          const granted = await locationService.requestPermission();
+          if (granted) {
+            const loc = await locationService.getCurrentLocation();
+            setUserLocation(loc);
+            setRegion({ ...DEFAULT_MAP_REGION, latitude: loc.latitude, longitude: loc.longitude });
+          }
+        })(),
+        loadDefaultPreset(),
+      ]);
+      if (defaultFilter) {
+        setFilters(defaultFilter);
       }
     })();
+  }, []);
+
+  // Fetch reliability scores on mount
+  useEffect(() => {
+    reliabilityScoreService.getAllScores().then(setReliabilityScores);
   }, []);
 
   // Pass user location to the station query for OCM proximity search
@@ -74,6 +89,7 @@ export function MapScreen({ navigation }: any) {
             <StationMarker
               status={station.status || 'offline'}
               providerSlug={station.provider?.slug || ''}
+              reliabilityScore={reliabilityScores.get(station.id)}
             />
           </Marker>
         ))}
@@ -89,6 +105,7 @@ export function MapScreen({ navigation }: any) {
         <StationBottomSheet
           stations={displayStations.slice(0, 20)}
           onStationPress={handleStationPress}
+          reliabilityScores={reliabilityScores}
         />
       </View>
       <FilterModal

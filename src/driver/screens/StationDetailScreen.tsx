@@ -10,6 +10,9 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
+  Image,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useStationDetail } from '@/core/queries/useStationDetail';
@@ -18,6 +21,8 @@ import { ConnectorRow } from '../components/ConnectorRow';
 import { AmenityBadge } from '../components/AmenityBadge';
 import { StationRating } from '../components/StationRating';
 import { stationReportService, StationLiveStatus, StationStatus } from '@/core/services/stationReportService';
+import { reliabilityScoreService, type ReliabilityScore } from '@/core/services/reliabilityScoreService';
+import { ReliabilityBadge } from '@/core/components/ReliabilityBadge';
 import { useTheme } from '@/core/theme';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
@@ -34,6 +39,10 @@ export function StationDetailScreen({ route, navigation }: any) {
   const [spots, setSpots] = useState('');
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isNearby, setIsNearby] = useState(false);
+  const [communityPhotos, setCommunityPhotos] = useState<string[]>([]);
+  const [photoModalVisible, setPhotoModalVisible] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [reliabilityScore, setReliabilityScore] = useState<ReliabilityScore | null>(null);
 
   // Get user location
   useEffect(() => {
@@ -61,6 +70,8 @@ export function StationDetailScreen({ route, navigation }: any) {
   useEffect(() => {
     if (station?.id) {
       stationReportService.getLiveStatus(station.id).then(setLiveStatus);
+      stationReportService.getPhotosForStation(station.id).then(setCommunityPhotos);
+      reliabilityScoreService.getScore(station.id).then(setReliabilityScore);
     }
   }, [station?.id]);
 
@@ -82,8 +93,10 @@ export function StationDetailScreen({ route, navigation }: any) {
     setReportLoading(false);
     if (success) {
       setReportSubmitted(true);
-      // Refresh live status
+      // Refresh live status + reliability score
       stationReportService.getLiveStatus(station.id).then(setLiveStatus);
+      reliabilityScoreService.invalidateCache();
+      reliabilityScoreService.getScore(station.id).then(setReliabilityScore);
       Alert.alert('Thanks! ⚡', 'Your report helps other EV drivers.');
     }
   };
@@ -92,6 +105,7 @@ export function StationDetailScreen({ route, navigation }: any) {
     ? liveStatus.status === 'available' ? colors.statusAvailable
     : liveStatus.status === 'partially_available' ? colors.statusPartial
     : liveStatus.status === 'busy' ? colors.statusOccupied
+    : liveStatus.status === 'iced' ? colors.warning
     : colors.error
     : colors.textTertiary;
 
@@ -99,6 +113,7 @@ export function StationDetailScreen({ route, navigation }: any) {
     ? liveStatus.status === 'available' ? 'Available'
     : liveStatus.status === 'partially_available' ? 'Partially Available'
     : liveStatus.status === 'busy' ? 'All Busy'
+    : liveStatus.status === 'iced' ? 'ICE\'d / Blocked'
     : 'Out of Service'
     : 'No reports yet';
 
@@ -185,6 +200,7 @@ export function StationDetailScreen({ route, navigation }: any) {
                   { status: 'partially_available' as StationStatus, icon: '🟡', label: 'Some Free', color: colors.statusPartial },
                   { status: 'busy' as StationStatus, icon: '🔴', label: 'Busy', color: colors.statusOccupied },
                   { status: 'out_of_service' as StationStatus, icon: '⚠️', label: 'Broken', color: colors.error },
+                  { status: 'iced' as StationStatus, icon: '🚗', label: 'ICE\'d', color: colors.warning },
                 ]).map(opt => (
                   <TouchableOpacity
                     key={opt.status}
@@ -234,7 +250,15 @@ export function StationDetailScreen({ route, navigation }: any) {
           <Text style={{ ...typography.caption, color: colors.primary, fontWeight: '600', marginBottom: 4 }}>
             {(station as any).provider?.name}
           </Text>
-          <Text style={{ ...typography.body, color: colors.textSecondary, marginBottom: 14 }}>{station.address}</Text>
+          <Text style={{ ...typography.body, color: colors.textSecondary, marginBottom: station.operating_hours ? 8 : 14 }}>{station.address}</Text>
+
+          {/* Operating Hours */}
+          {station.operating_hours && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 14 }}>
+              <Text style={{ fontSize: 14 }}>{'\uD83D\uDD52'}</Text>
+              <Text style={{ ...typography.caption, color: colors.textSecondary }}>{station.operating_hours}</Text>
+            </View>
+          )}
 
           {/* Rating + Reliability side by side */}
           <View style={{ flexDirection: 'row', gap: 12, marginBottom: 14 }}>
@@ -254,26 +278,38 @@ export function StationDetailScreen({ route, navigation }: any) {
               <Text style={{ ...typography.small, color: colors.textSecondary }}>{station.review_count} reviews</Text>
             </View>
 
-            {/* Reliability score card */}
+            {/* WattsOn Reliability Score card */}
             {(() => {
-              const reliabilityScore = station.rating_avg > 0 ? Math.round(station.rating_avg * 20) : null;
-              const reliabilityColor = reliabilityScore && reliabilityScore >= 80 ? colors.statusAvailable
-                : reliabilityScore && reliabilityScore >= 60 ? colors.statusPartial
-                : reliabilityScore ? colors.statusOccupied : colors.textTertiary;
-              const reliabilityLabel = reliabilityScore && reliabilityScore >= 80 ? 'Excellent'
-                : reliabilityScore && reliabilityScore >= 70 ? 'Good'
-                : reliabilityScore && reliabilityScore >= 60 ? 'Fair'
-                : reliabilityScore ? 'Poor' : 'Unknown';
+              const scoreColor = reliabilityScore
+                ? reliabilityScore.color === 'green' ? colors.statusAvailable
+                  : reliabilityScore.color === 'yellow' ? colors.statusPartial
+                  : colors.statusOccupied
+                : colors.textTertiary;
+              const scoreLabel = reliabilityScore
+                ? reliabilityScore.label === 'excellent' ? 'Excellent'
+                  : reliabilityScore.label === 'good' ? 'Good'
+                  : reliabilityScore.label === 'poor' ? 'Poor'
+                  : 'Fair'
+                : 'No data';
               return (
                 <View style={{
                   flex: 1, backgroundColor: colors.surfaceSecondary, borderRadius: 12, padding: 14,
-                  borderWidth: 1, borderColor: (reliabilityColor || colors.border) + '30', alignItems: 'center',
+                  borderWidth: 1, borderColor: (scoreColor || colors.border) + '30', alignItems: 'center',
                 }}>
-                  <Text style={{ ...typography.mono, fontSize: 28, color: reliabilityColor }}>
-                    {reliabilityScore ? `${reliabilityScore}%` : '—'}
+                  <Text style={{ ...typography.mono, fontSize: 28, color: scoreColor }}>
+                    {reliabilityScore ? reliabilityScore.score.toFixed(1) : '—'}
                   </Text>
-                  <Text style={{ fontSize: 14, marginVertical: 4 }}>🛡️</Text>
-                  <Text style={{ ...typography.small, color: colors.textSecondary }}>Reliability: {reliabilityLabel}</Text>
+                  <Text style={{ ...typography.small, color: colors.textSecondary, marginVertical: 4 }}>
+                    / 10
+                  </Text>
+                  <Text style={{ ...typography.small, color: colors.textSecondary }}>
+                    Reliability: {scoreLabel}
+                  </Text>
+                  {reliabilityScore && (
+                    <Text style={{ ...typography.small, fontSize: 9, color: colors.textTertiary, marginTop: 2 }}>
+                      {reliabilityScore.totalReports} verified report{reliabilityScore.totalReports !== 1 ? 's' : ''}
+                    </Text>
+                  )}
                 </View>
               );
             })()}
@@ -294,10 +330,111 @@ export function StationDetailScreen({ route, navigation }: any) {
           <Text style={{ ...typography.bodyBold, color: colors.text, marginBottom: spacing.sm }}>Community Status</Text>
           <Text style={{ ...typography.body, color: colors.textSecondary, fontStyle: 'italic' }}>
             {liveStatus
-              ? `Last reported: ${liveStatus.status === 'available' ? 'Available' : liveStatus.status === 'busy' ? 'Busy' : liveStatus.status === 'partially_available' ? 'Partially available' : 'Out of service'} (${liveStatus.timeAgo})`
+              ? `Last reported: ${liveStatus.status === 'available' ? 'Available' : liveStatus.status === 'busy' ? 'Busy' : liveStatus.status === 'partially_available' ? 'Partially available' : liveStatus.status === 'iced' ? 'ICE\'d / Blocked' : 'Out of service'} (${liveStatus.timeAgo})`
               : 'No community reports yet — be the first to report!'}
           </Text>
         </Card>
+
+        {/* Community Photos */}
+        {communityPhotos.length > 0 && (
+          <Card style={{ marginBottom: spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+              <Text style={{ ...typography.bodyBold, color: colors.text }}>Community Photos</Text>
+              <Text style={{ ...typography.small, color: colors.textTertiary }}>
+                {communityPhotos.length} photo{communityPhotos.length !== 1 ? 's' : ''}
+              </Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={{ marginHorizontal: -4 }}
+            >
+              <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 4 }}>
+                {communityPhotos.map((url, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    onPress={() => { setSelectedPhotoIndex(index); setPhotoModalVisible(true); }}
+                    activeOpacity={0.85}
+                  >
+                    <Image
+                      source={{ uri: url }}
+                      style={{
+                        width: 120, height: 90, borderRadius: 12,
+                        borderWidth: 1.5, borderColor: colors.primary + '25',
+                      }}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </Card>
+        )}
+
+        {/* Photo fullscreen modal */}
+        <Modal
+          visible={photoModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPhotoModalVisible(false)}
+        >
+          <View style={{
+            flex: 1, backgroundColor: 'rgba(0,0,0,0.92)',
+            justifyContent: 'center', alignItems: 'center',
+          }}>
+            <TouchableOpacity
+              onPress={() => setPhotoModalVisible(false)}
+              style={{ position: 'absolute', top: 50, right: 20, zIndex: 10, padding: 8 }}
+            >
+              <Text style={{ color: '#fff', fontSize: 28, fontWeight: '700' }}>{'\u2715'}</Text>
+            </TouchableOpacity>
+
+            {communityPhotos[selectedPhotoIndex] && (
+              <Image
+                source={{ uri: communityPhotos[selectedPhotoIndex] }}
+                style={{
+                  width: Dimensions.get('window').width - 32,
+                  height: Dimensions.get('window').height * 0.6,
+                  borderRadius: 16,
+                }}
+                resizeMode="contain"
+              />
+            )}
+
+            {/* Photo counter */}
+            <Text style={{ color: '#fff', ...typography.caption, marginTop: 16, opacity: 0.7 }}>
+              {selectedPhotoIndex + 1} / {communityPhotos.length}
+            </Text>
+
+            {/* Nav arrows */}
+            <View style={{ flexDirection: 'row', gap: 40, marginTop: 16 }}>
+              <TouchableOpacity
+                onPress={() => setSelectedPhotoIndex(i => Math.max(0, i - 1))}
+                style={{
+                  width: 48, height: 48, borderRadius: 24,
+                  backgroundColor: 'rgba(255,255,255,0.15)',
+                  alignItems: 'center', justifyContent: 'center',
+                  opacity: selectedPhotoIndex === 0 ? 0.3 : 1,
+                }}
+                disabled={selectedPhotoIndex === 0}
+              >
+                <Text style={{ color: '#fff', fontSize: 22 }}>{'\u2039'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setSelectedPhotoIndex(i => Math.min(communityPhotos.length - 1, i + 1))}
+                style={{
+                  width: 48, height: 48, borderRadius: 24,
+                  backgroundColor: 'rgba(255,255,255,0.15)',
+                  alignItems: 'center', justifyContent: 'center',
+                  opacity: selectedPhotoIndex === communityPhotos.length - 1 ? 0.3 : 1,
+                }}
+                disabled={selectedPhotoIndex === communityPhotos.length - 1}
+              >
+                <Text style={{ color: '#fff', fontSize: 22 }}>{'\u203A'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
 
         {/* Connectors */}
         <Card style={{ marginBottom: spacing.md }}>

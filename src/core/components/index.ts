@@ -4,3 +4,4 @@ export { Header } from './Header';
 export { Badge } from './Badge';
 export { Avatar } from './Avatar';
 export { LoadingScreen } from './LoadingScreen';
+export { ReliabilityBadge } from './ReliabilityBadge';

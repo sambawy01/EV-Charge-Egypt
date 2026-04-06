@@ -12,7 +12,7 @@ import {
 import { useStations } from '@/core/queries/useStations';
 import { useMapStore } from '@/core/stores/mapStore';
 import { WebMap } from '../components/WebMap';
-import { FilterModal } from '../components/FilterModal';
+import { FilterModal, loadDefaultPreset } from '../components/FilterModal';
 import { ProximityReporter } from '../components/ProximityReporter';
 import { LoadingScreen } from '@/core/components';
 import { colors } from '@/core/theme/colors';
@@ -21,6 +21,8 @@ import { typography } from '@/core/theme/typography';
 import type { Station } from '@/core/types/station';
 import { aiContextService } from '@/core/services/aiContextService';
 import { stationReportService } from '@/core/services/stationReportService';
+import { reliabilityScoreService, type ReliabilityScore } from '@/core/services/reliabilityScoreService';
+import { ReliabilityBadge } from '@/core/components/ReliabilityBadge';
 import { supabase } from '@/core/config/supabase';
 import { useVehicles } from '@/core/queries/useVehicles';
 
@@ -126,6 +128,13 @@ export function MapScreen({ navigation }: any) {
   const { data: stations, isLoading } = useStations(filters, userLocation);
   const { data: vehicles } = useVehicles();
 
+  // Load default filter preset on mount
+  useEffect(() => {
+    loadDefaultPreset().then((defaultFilter) => {
+      if (defaultFilter) setFilters(defaultFilter);
+    });
+  }, []);
+
   // Listen for messages from the map iframe (station clicks + status reports)
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -214,9 +223,11 @@ export function MapScreen({ navigation }: any) {
 
   // Live community statuses
   const [liveStatuses, setLiveStatuses] = useState<Map<string, any>>(new Map());
+  const [reliabilityScores, setReliabilityScores] = useState<Map<string, ReliabilityScore>>(new Map());
 
   useEffect(() => {
     stationReportService.getAllLiveStatuses().then(setLiveStatuses);
+    reliabilityScoreService.getAllScores().then(setReliabilityScores);
   }, []);
 
   // Subscribe to real-time status updates
@@ -224,8 +235,10 @@ export function MapScreen({ navigation }: any) {
     const channel = supabase
       .channel('station-reports')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'station_reports' }, () => {
-        // Refresh live statuses when a new report comes in
+        // Refresh live statuses and reliability scores when a new report comes in
         stationReportService.getAllLiveStatuses().then(setLiveStatuses);
+        reliabilityScoreService.invalidateCache();
+        reliabilityScoreService.getAllScores().then(setReliabilityScores);
       })
       .subscribe();
 
@@ -387,12 +400,12 @@ export function MapScreen({ navigation }: any) {
                     if (!live) return null;
                     const liveColor = live.status === 'available' ? colors.statusAvailable :
                       live.status === 'partially_available' ? colors.statusPartial :
-                      live.status === 'busy' ? colors.statusOccupied : colors.error;
+                      live.status === 'busy' ? colors.statusOccupied : live.status === 'iced' ? colors.warning : colors.error;
                     return (
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
                         <Text style={{ fontSize: 8 }}>{'\uD83D\uDCE1'}</Text>
                         <Text style={{ fontSize: 9, color: liveColor, fontWeight: '600' }}>
-                          {live.status === 'available' ? 'Available' : live.status === 'partially_available' ? 'Some free' : live.status === 'busy' ? 'Busy' : 'Out of service'}
+                          {live.status === 'available' ? 'Available' : live.status === 'partially_available' ? 'Some free' : live.status === 'busy' ? 'Busy' : live.status === 'iced' ? 'ICE\'d' : 'Out of service'}
                         </Text>
                         <Text style={{ fontSize: 8, color: colors.textTertiary }}>{'\u00B7'} {live.timeAgo} {'\u00B7'} {live.lastReportTime}</Text>
                       </View>
@@ -416,6 +429,7 @@ export function MapScreen({ navigation }: any) {
                               { text: '\uD83D\uDFE1 Some Free', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'partially_available' }).then(() => Alert.alert('Thanks! \u26A1')) },
                               { text: '\uD83D\uDD34 All Busy', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'busy' }).then(() => Alert.alert('Thanks! \u26A1')) },
                               { text: '\u26A0\uFE0F Broken', style: 'destructive', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'out_of_service' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                              { text: '\uD83D\uDE97 ICE\'d', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'iced' }).then(() => Alert.alert('Thanks! \u26A1')) },
                               { text: 'Cancel', style: 'cancel' },
                             ]
                           );
@@ -617,25 +631,30 @@ export function MapScreen({ navigation }: any) {
                         <Text style={styles.providerText}>{providerName}</Text>
                       ) : null}
                     </View>
-                    {station.rating_avg > 0 && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                        <Text style={{ fontSize: 10, color: '#FFB020' }}>{'\u2605'}</Text>
-                        <Text style={{ fontSize: 10, color: colors.textSecondary }}>
-                          {station.rating_avg.toFixed(1)} ({station.review_count})
-                        </Text>
-                      </View>
-                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                      {station.rating_avg > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                          <Text style={{ fontSize: 10, color: '#FFB020' }}>{'\u2605'}</Text>
+                          <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                            {station.rating_avg.toFixed(1)} ({station.review_count})
+                          </Text>
+                        </View>
+                      )}
+                      {reliabilityScores.has(station.id) && (
+                        <ReliabilityBadge score={reliabilityScores.get(station.id)!} />
+                      )}
+                    </View>
                     {(() => {
                       const live = liveStatuses.get(station.id);
                       if (!live) return null;
                       const liveColor = live.status === 'available' ? colors.statusAvailable :
                         live.status === 'partially_available' ? colors.statusPartial :
-                        live.status === 'busy' ? colors.statusOccupied : colors.error;
+                        live.status === 'busy' ? colors.statusOccupied : live.status === 'iced' ? colors.warning : colors.error;
                       return (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 }}>
                           <Text style={{ fontSize: 8 }}>{'\uD83D\uDCE1'}</Text>
                           <Text style={{ fontSize: 9, color: liveColor, fontWeight: '600' }}>
-                            {live.status === 'available' ? 'Available' : live.status === 'partially_available' ? 'Some free' : live.status === 'busy' ? 'Busy' : 'Out of service'}
+                            {live.status === 'available' ? 'Available' : live.status === 'partially_available' ? 'Some free' : live.status === 'busy' ? 'Busy' : live.status === 'iced' ? 'ICE\'d' : 'Out of service'}
                           </Text>
                           <Text style={{ fontSize: 8, color: colors.textTertiary }}>{'\u00B7'} {live.timeAgo} {'\u00B7'} {live.lastReportTime}</Text>
                         </View>
@@ -703,6 +722,7 @@ export function MapScreen({ navigation }: any) {
                               { text: '\uD83D\uDFE1 Some Free', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'partially_available' }).then(() => Alert.alert('Thanks! \u26A1')) },
                               { text: '\uD83D\uDD34 All Busy', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'busy' }).then(() => Alert.alert('Thanks! \u26A1')) },
                               { text: '\u26A0\uFE0F Broken', style: 'destructive', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'out_of_service' }).then(() => Alert.alert('Thanks! \u26A1')) },
+                              { text: '\uD83D\uDE97 ICE\'d', onPress: () => stationReportService.submitReport({ stationId: station.id, userId: undefined, status: 'iced' }).then(() => Alert.alert('Thanks! \u26A1')) },
                               { text: 'Cancel', style: 'cancel' },
                             ]
                           );

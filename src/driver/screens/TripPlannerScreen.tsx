@@ -11,11 +11,12 @@ import {
   Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Polyline, Line, Text as SvgText, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useTheme } from '@/core/theme';
 import { typography } from '@/core/theme/typography';
 import { useVehicles } from '@/core/queries/useVehicles';
 import { evDatabase, EVModel } from '@/core/data/evDatabase';
-import { googleMapsService } from '@/core/services/googleMapsService';
+import { googleMapsService, ElevationProfile } from '@/core/services/googleMapsService';
 import { stationService } from '@/core/services/stationService';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -37,14 +38,25 @@ interface ChargingStop {
   attractions: { name: string; type: string; distance: string; icon: string }[];
 }
 
+interface WaypointInfo {
+  name: string;
+  distanceFromStart: number;
+  segmentDistanceKm: number;
+  segmentDurationMin: number;
+}
+
 interface TripPlan {
   from: string;
   to: string;
+  waypoints?: WaypointInfo[];
   totalDistance: number;
   totalTime: string;
   totalChargeCost: number;
   arrivalBattery: number;
   stops: ChargingStop[];
+  elevationProfile?: ElevationProfile | null;
+  elevationRangeAdjustment?: number; // percentage adjustment to range (negative = reduced)
+  speedRangeAdjustment?: number; // percentage adjustment from speed
 }
 
 type ChargingStrategy = 'quick' | 'fewer';
@@ -79,8 +91,14 @@ export function TripPlannerScreen({ navigation }: any) {
   const [to, setTo] = useState('');
   const [fromSuggestions, setFromSuggestions] = useState<{ description: string; placeId: string }[]>([]);
   const [toSuggestions, setToSuggestions] = useState<{ description: string; placeId: string }[]>([]);
-  const [activeField, setActiveField] = useState<'from' | 'to' | null>(null);
+  const [activeField, setActiveField] = useState<'from' | 'to' | `waypoint-${number}` | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Waypoints state (intermediate stops)
+  const MAX_WAYPOINTS = 3;
+  const [waypoints, setWaypoints] = useState<string[]>([]);
+  const [waypointSuggestions, setWaypointSuggestions] = useState<{ [key: number]: { description: string; placeId: string }[] }>({});
+
   const [batteryLevel, setBatteryLevel] = useState(80);
   const [avgSpeed, setAvgSpeed] = useState(120);
   const [chargingStrategy, setChargingStrategy] = useState<ChargingStrategy>('quick');
@@ -266,12 +284,29 @@ export function TripPlannerScreen({ navigation }: any) {
     return result;
   }
 
+  // Speed range multiplier: 100kph = +5%, 120kph = baseline, 140kph = -10%, 160kph = -20%
+  function getSpeedRangeMultiplier(speed: number): number {
+    if (speed <= 100) return 1.05;
+    if (speed <= 120) return 1 + (120 - speed) * 0.0025;
+    return 1 - (speed - 120) * 0.005;
+  }
+
+  // Elevation range multiplier: uphill costs ~1% per 100m gain, downhill recovers ~0.5% per 100m loss
+  function getElevationRangeMultiplier(profile: ElevationProfile | null | undefined): number {
+    if (!profile) return 1;
+    const ascentPenalty = (profile.totalAscent / 100) * 0.01;
+    const descentBonus = (profile.totalDescent / 100) * 0.005;
+    return Math.max(0.5, 1 - ascentPenalty + descentBonus);
+  }
+
   // Build a TripPlan from raw stop data and a total distance (shared by both real + fallback paths)
-  function buildTripPlan(rawStops: any[], totalDistance: number): TripPlan {
-    const speedFactor = avgSpeed > 120 ? 1 + (avgSpeed - 120) * 0.008 : 1;
+  function buildTripPlan(rawStops: any[], totalDistance: number, waypointInfos?: WaypointInfo[], elevationProfile?: ElevationProfile | null): TripPlan {
+    const speedMultiplier = getSpeedRangeMultiplier(avgSpeed);
+    const elevationMultiplier = getElevationRangeMultiplier(elevationProfile);
+    const combinedFactor = (1 / speedMultiplier) * (1 / elevationMultiplier);
     const vehicleBatteryKwh = selectedVehicle?.battery_capacity_kwh || 60;
     const baseConsumption = (vehicleBatteryKwh / (spec?.rangeKm || 400)) * 100;
-    const actualConsumption = baseConsumption * speedFactor;
+    const actualConsumption = baseConsumption * combinedFactor;
 
     let currentBattery = batteryLevel;
     const stops: ChargingStop[] = rawStops.map((stop: any, i: number) => {
@@ -322,11 +357,15 @@ export function TripPlannerScreen({ navigation }: any) {
     return {
       from,
       to,
+      waypoints: waypointInfos,
       totalDistance,
       totalTime: `${hours}h ${mins}m`,
       totalChargeCost: stops.reduce((sum, s) => sum + s.chargeCost, 0),
       arrivalBattery,
       stops,
+      elevationProfile,
+      elevationRangeAdjustment: elevationProfile ? Math.round((elevationMultiplier - 1) * 100) : 0,
+      speedRangeAdjustment: Math.round((speedMultiplier - 1) * 100),
     };
   }
 
@@ -337,12 +376,14 @@ export function TripPlannerScreen({ navigation }: any) {
   const generateTripPlanAsync = useCallback(async (): Promise<TripPlan> => {
     const vehicleBatteryKwh = selectedVehicle?.battery_capacity_kwh || 60;
     const rangeKm = spec?.rangeKm || Math.round(vehicleBatteryKwh * 6.5);
-    const speedFactor = avgSpeed > 120 ? 1 + (avgSpeed - 120) * 0.008 : 1;
-    const kmPerPercent = rangeKm / 100 / speedFactor;
+    const speedMult = getSpeedRangeMultiplier(avgSpeed);
+    const kmPerPercent = (rangeKm * speedMult) / 100;
+
+    const validWaypoints = waypoints.filter(wp => wp.trim());
 
     try {
-      // Step 1: Get real route from Google Directions
-      const directions = await googleMapsService.getDirections(from, to);
+      // Step 1: Get real route from Google Directions (with waypoints if any)
+      const directions = await googleMapsService.getDirections(from, to, validWaypoints.length > 0 ? validWaypoints : undefined);
 
       // Step 2: Get all stations from Supabase
       const allStations = await stationService.getStations();
@@ -410,39 +451,79 @@ export function TripPlannerScreen({ navigation }: any) {
           }),
         );
 
-        return buildTripPlan(stopsWithAttractions, directions.totalDistanceKm);
+        // Build waypoint info from direction legs (legs > 1 means waypoints exist)
+        let waypointInfos: WaypointInfo[] | undefined;
+        if (validWaypoints.length > 0 && directions.legs.length > 1) {
+          let cumulativeDist = 0;
+          waypointInfos = validWaypoints.map((wpName, i) => {
+            cumulativeDist += directions.legs[i].distanceKm;
+            return {
+              name: wpName,
+              distanceFromStart: cumulativeDist,
+              segmentDistanceKm: directions.legs[i].distanceKm,
+              segmentDurationMin: directions.legs[i].durationMin,
+            };
+          });
+        }
+
+        // Step 6: Fetch elevation profile along the route polyline
+        let elevationProfile: ElevationProfile | null = null;
+        try {
+          elevationProfile = await googleMapsService.getElevationProfile(
+            directions.polyline,
+            directions.totalDistanceKm,
+          );
+        } catch (elevErr) {
+          console.warn('[TripPlanner] Elevation API failed (non-blocking):', elevErr);
+        }
+
+        return buildTripPlan(stopsWithAttractions, directions.totalDistanceKm, waypointInfos, elevationProfile);
       }
     } catch (err) {
       console.warn('[TripPlanner] Directions API failed, trying geocode fallback:', err);
     }
 
-    // Fallback: geocode both cities and find stations along the corridor
+    // Fallback: geocode both cities (and waypoints) and find stations along the corridor
     try {
-      const [fromCoords, toCoords] = await Promise.all([geocodeCity(from), geocodeCity(to)]);
+      const allPoints = [from, ...validWaypoints, to];
+      const allCoords = await Promise.all(allPoints.map(p => geocodeCity(p)));
+
+      const fromCoords = allCoords[0];
+      const toCoords = allCoords[allCoords.length - 1];
 
       if (fromCoords && toCoords) {
-        const straightDist = haversineKm(fromCoords.lat, fromCoords.lng, toCoords.lat, toCoords.lng);
-        const roadDistance = Math.round(straightDist * 1.3); // Egyptian roads ~30% longer than straight line
+        // Build segments: from -> wp1 -> wp2 -> ... -> to
+        let totalRoadDistance = 0;
+        const segmentDistances: number[] = [];
+        for (let i = 0; i < allCoords.length - 1; i++) {
+          const c1 = allCoords[i] || fromCoords;
+          const c2 = allCoords[i + 1] || toCoords;
+          const segDist = Math.round(haversineKm(c1.lat, c1.lng, c2.lat, c2.lng) * 1.3);
+          segmentDistances.push(segDist);
+          totalRoadDistance += segDist;
+        }
 
         const allStations = await stationService.getStations();
+        // Find stations along full corridor (origin to destination)
         const routeStations = findStationsAlongLine(
           allStations, fromCoords.lat, fromCoords.lng, toCoords.lat, toCoords.lng, 25
         );
 
         // Adjust distanceFromStart to road-distance scale (stations found on straight line)
+        const scaleFactor = totalRoadDistance / haversineKm(fromCoords.lat, fromCoords.lng, toCoords.lat, toCoords.lng);
         const scaledStations = routeStations.map((s: any) => ({
           ...s,
-          distanceFromStart: Math.round(s.distanceFromStart * 1.3),
+          distanceFromStart: Math.round(s.distanceFromStart * scaleFactor),
           stationName: s.name || s.stationName || 'Charging Station',
           stationId: s.id,
-          location: s.address || s.city || `KM ${Math.round(s.distanceFromStart * 1.3)}`,
+          location: s.address || s.city || `KM ${Math.round(s.distanceFromStart * scaleFactor)}`,
           chargerType: s.connectors?.[0]
             ? `${s.connectors[0].type} ${s.connectors[0].power_kw}kW`
             : 'CCS2 50kW',
         }));
 
         const selectedStops = selectOptimalStops(
-          scaledStations, roadDistance, batteryLevel, kmPerPercent, chargingStrategy
+          scaledStations, totalRoadDistance, batteryLevel, kmPerPercent, chargingStrategy
         );
 
         // Get nearby attractions for each stop
@@ -460,7 +541,23 @@ export function TripPlannerScreen({ navigation }: any) {
           })
         );
 
-        return buildTripPlan(stopsWithAttractions, roadDistance);
+        // Build waypoint info for fallback path
+        let fallbackWaypointInfos: WaypointInfo[] | undefined;
+        if (validWaypoints.length > 0) {
+          let cumulativeDist = 0;
+          fallbackWaypointInfos = validWaypoints.map((wpName, i) => {
+            cumulativeDist += segmentDistances[i];
+            const segDurationMin = Math.round((segmentDistances[i] / avgSpeed) * 60);
+            return {
+              name: wpName,
+              distanceFromStart: cumulativeDist,
+              segmentDistanceKm: segmentDistances[i],
+              segmentDurationMin: segDurationMin,
+            };
+          });
+        }
+
+        return buildTripPlan(stopsWithAttractions, totalRoadDistance, fallbackWaypointInfos);
       }
     } catch (err) {
       console.warn('[TripPlanner] Geocode fallback also failed:', err);
@@ -468,7 +565,7 @@ export function TripPlannerScreen({ navigation }: any) {
 
     // Last resort: generic estimated plan when all APIs fail
     return getLastResortPlan();
-  }, [from, to, batteryLevel, avgSpeed, chargingStrategy, selectedVehicle, spec]);
+  }, [from, to, waypoints, batteryLevel, avgSpeed, chargingStrategy, selectedVehicle, spec]);
 
   // ---------------------------------------------------------------------------
   // Step 2 animation logic
@@ -501,16 +598,17 @@ export function TripPlannerScreen({ navigation }: any) {
     // Show step labels progressively while async work happens
     const timers: NodeJS.Timeout[] = [];
     timers.push(setTimeout(() => setPlanningSteps((p) => [...p, 0]), 400));
-    timers.push(setTimeout(() => setPlanningSteps((p) => [...p, 1]), 1000));
-    timers.push(setTimeout(() => setPlanningSteps((p) => [...p, 2]), 1800));
-    timers.push(setTimeout(() => setPlanningSteps((p) => [...p, 3]), 2400));
+    timers.push(setTimeout(() => setPlanningSteps((p) => [...p, 1]), 900));
+    timers.push(setTimeout(() => setPlanningSteps((p) => [...p, 2]), 1500));
+    timers.push(setTimeout(() => setPlanningSteps((p) => [...p, 3]), 2100));
+    timers.push(setTimeout(() => setPlanningSteps((p) => [...p, 4]), 2700));
 
     // Run the async trip planner (real APIs with fallback)
     const planPromise = generateTripPlanAsync();
 
     // Wait for both the minimum animation time AND the plan to resolve
     const minDelay = new Promise<void>((resolve) => {
-      timers.push(setTimeout(resolve, 3200));
+      timers.push(setTimeout(resolve, 3500));
     });
 
     Promise.all([planPromise, minDelay]).then(([plan]) => {
@@ -551,16 +649,58 @@ export function TripPlannerScreen({ navigation }: any) {
     }, 200);
   };
 
-  const selectSuggestion = (field: 'from' | 'to', description: string) => {
+  const selectSuggestion = (field: 'from' | 'to' | `waypoint-${number}`, description: string) => {
     const city = description.split(',')[0].trim();
     if (field === 'from') {
       setFrom(city);
       setFromSuggestions([]);
-    } else {
+    } else if (field === 'to') {
       setTo(city);
       setToSuggestions([]);
+    } else if (field.startsWith('waypoint-')) {
+      const idx = parseInt(field.split('-')[1], 10);
+      setWaypoints(prev => { const n = [...prev]; n[idx] = city; return n; });
+      setWaypointSuggestions(prev => { const n = { ...prev }; delete n[idx]; return n; });
     }
     setActiveField(null);
+  };
+
+  // Waypoint handlers
+  const handleWaypointChange = (text: string, index: number) => {
+    setWaypoints(prev => { const n = [...prev]; n[index] = text; return n; });
+    setActiveField(`waypoint-${index}`);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const results = await googleMapsService.autocompletePlaces(text);
+      setWaypointSuggestions(prev => ({ ...prev, [index]: results }));
+    }, 200);
+  };
+
+  const addWaypoint = () => {
+    if (waypoints.length >= MAX_WAYPOINTS) {
+      Alert.alert('Limit Reached', 'Maximum 3 intermediate stops allowed.');
+      return;
+    }
+    setWaypoints(prev => [...prev, '']);
+  };
+
+  const removeWaypoint = (index: number) => {
+    setWaypoints(prev => prev.filter((_, i) => i !== index));
+    setWaypointSuggestions(prev => {
+      const n = { ...prev };
+      delete n[index];
+      return n;
+    });
+  };
+
+  const moveWaypoint = (index: number, direction: 'up' | 'down') => {
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+    if (newIndex < 0 || newIndex >= waypoints.length) return;
+    setWaypoints(prev => {
+      const n = [...prev];
+      [n[index], n[newIndex]] = [n[newIndex], n[index]];
+      return n;
+    });
   };
 
   const handlePlanTrip = () => {
@@ -721,6 +861,109 @@ export function TripPlannerScreen({ navigation }: any) {
               {locatingFrom ? 'Detecting location...' : 'Use my current location'}
             </Text>
           </TouchableOpacity>
+
+          {/* Waypoints (intermediate stops) */}
+          {waypoints.map((wp, idx) => (
+            <React.Fragment key={`waypoint-${idx}`}>
+              <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 38 }} />
+              <View style={{ zIndex: 10 - idx }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View
+                    style={{
+                      width: 24, height: 24, borderRadius: 12,
+                      backgroundColor: colors.accent || colors.primaryLight,
+                      justifyContent: 'center', alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ ...typography.small, color: '#fff', fontWeight: '700', fontSize: 11 }}>
+                      {idx + 1}
+                    </Text>
+                  </View>
+                  <TextInput
+                    value={wp}
+                    onChangeText={(text) => handleWaypointChange(text, idx)}
+                    onFocus={() => setActiveField(`waypoint-${idx}`)}
+                    onBlur={() => setTimeout(() => { if (activeField === `waypoint-${idx}`) setActiveField(null); }, 200)}
+                    placeholder={`Stop ${idx + 1} (e.g. Ain Sokhna)`}
+                    placeholderTextColor={colors.textTertiary}
+                    style={{
+                      flex: 1, ...typography.body, color: colors.text,
+                      backgroundColor: colors.surfaceSecondary, borderRadius: 10,
+                      paddingHorizontal: 14, paddingVertical: 12,
+                      borderWidth: 1, borderColor: activeField === `waypoint-${idx}` ? (colors.accent || colors.primary) : colors.border,
+                    }}
+                  />
+                  <View style={{ gap: 2 }}>
+                    {idx > 0 && (
+                      <TouchableOpacity onPress={() => moveWaypoint(idx, 'up')} style={{ padding: 2 }}>
+                        <Text style={{ fontSize: 10, color: colors.textTertiary }}>{'\u25B2'}</Text>
+                      </TouchableOpacity>
+                    )}
+                    {idx < waypoints.length - 1 && (
+                      <TouchableOpacity onPress={() => moveWaypoint(idx, 'down')} style={{ padding: 2 }}>
+                        <Text style={{ fontSize: 10, color: colors.textTertiary }}>{'\u25BC'}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => removeWaypoint(idx)}
+                    style={{
+                      width: 28, height: 28, borderRadius: 14,
+                      backgroundColor: colors.surfaceSecondary,
+                      justifyContent: 'center', alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ color: colors.textTertiary, fontSize: 16, fontWeight: '600', lineHeight: 18 }}>{'\u00D7'}</Text>
+                  </TouchableOpacity>
+                </View>
+                {activeField === `waypoint-${idx}` && (waypointSuggestions[idx] || []).length > 0 && (
+                  <View style={{
+                    position: 'absolute', top: 52, left: 38, right: 0,
+                    backgroundColor: colors.surface, borderWidth: 1,
+                    borderColor: colors.accent || colors.primary, borderRadius: 10,
+                    overflow: 'hidden', shadowColor: colors.primary,
+                    shadowOpacity: 0.2, shadowRadius: 10, elevation: 10, zIndex: 100,
+                  }}>
+                    {waypointSuggestions[idx].map((s, i) => (
+                      <TouchableOpacity
+                        key={s.placeId + i}
+                        onPress={() => selectSuggestion(`waypoint-${idx}`, s.description)}
+                        style={{
+                          paddingHorizontal: 14, paddingVertical: 11,
+                          borderBottomWidth: i < waypointSuggestions[idx].length - 1 ? 1 : 0,
+                          borderBottomColor: colors.border,
+                          flexDirection: 'row', alignItems: 'center', gap: 8,
+                        }}
+                      >
+                        <Text style={{ color: colors.accent || colors.primary, fontSize: 13 }}>{'\uD83D\uDCCD'}</Text>
+                        <Text style={{ ...typography.caption, color: colors.text, flex: 1 }} numberOfLines={1}>{s.description}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </React.Fragment>
+          ))}
+
+          {/* Add Stop button */}
+          {waypoints.length < MAX_WAYPOINTS && (
+            <>
+              <View style={{ height: 1, backgroundColor: colors.border, marginLeft: 38 }} />
+              <TouchableOpacity
+                onPress={addWaypoint}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+                  gap: 8, paddingVertical: 12, marginLeft: 38,
+                  borderWidth: 1.5, borderStyle: 'dashed',
+                  borderColor: colors.textTertiary, borderRadius: 10,
+                }}
+              >
+                <Text style={{ fontSize: 16, color: colors.textTertiary }}>+</Text>
+                <Text style={{ ...typography.caption, color: colors.textTertiary }}>Add Stop</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
           {/* Separator */}
           <View
             style={{
@@ -1104,6 +1347,7 @@ export function TripPlannerScreen({ navigation }: any) {
 
   const PLANNING_LABELS = [
     'Calculating energy consumption...',
+    'Analysing elevation profile...',
     'Finding charging stations along route...',
     'Optimizing stop duration...',
     'Checking nearby attractions...',
@@ -1209,7 +1453,11 @@ export function TripPlannerScreen({ navigation }: any) {
             }}
           >
             <Text style={{ ...typography.h2, color: colors.text, marginBottom: 20 }}>
-              {tripPlan.from} {'\u2192'} {tripPlan.to}
+              {tripPlan.from}
+              {tripPlan.waypoints && tripPlan.waypoints.length > 0
+                ? tripPlan.waypoints.map(wp => ` \u2192 ${wp.name}`).join('') + ` \u2192 ${tripPlan.to}`
+                : ` \u2192 ${tripPlan.to}`
+              }
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
               <View style={{ minWidth: (SCREEN_WIDTH - 80) / 4 - 12 }}>
@@ -1248,6 +1496,110 @@ export function TripPlannerScreen({ navigation }: any) {
           </LinearGradient>
         </View>
 
+        {/* Range Adjustments */}
+        {(tripPlan.speedRangeAdjustment !== 0 || tripPlan.elevationRangeAdjustment !== 0) && (
+          <View style={{ paddingHorizontal: 20, marginBottom: 16 }}>
+            <View style={{
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 14,
+              padding: 14,
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 10,
+            }}>
+              {tripPlan.speedRangeAdjustment !== 0 && (
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6,
+                  backgroundColor: (tripPlan.speedRangeAdjustment ?? 0) > 0 ? colors.secondaryGlow : (colors.warningGlow || 'rgba(255,165,0,0.1)'),
+                  paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+                }}>
+                  <Text style={{ fontSize: 14 }}>{'\uD83C\uDFCE\uFE0F'}</Text>
+                  <Text style={{ ...typography.small, color: (tripPlan.speedRangeAdjustment ?? 0) > 0 ? colors.secondary : (colors.warning || '#FFA500') }}>
+                    Speed: {(tripPlan.speedRangeAdjustment ?? 0) > 0 ? '+' : ''}{tripPlan.speedRangeAdjustment}% range
+                  </Text>
+                </View>
+              )}
+              {tripPlan.elevationRangeAdjustment !== 0 && tripPlan.elevationRangeAdjustment !== undefined && (
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6,
+                  backgroundColor: tripPlan.elevationRangeAdjustment > 0 ? colors.secondaryGlow : (colors.warningGlow || 'rgba(255,165,0,0.1)'),
+                  paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
+                }}>
+                  <Text style={{ fontSize: 14 }}>{'\u26F0\uFE0F'}</Text>
+                  <Text style={{ ...typography.small, color: tripPlan.elevationRangeAdjustment > 0 ? colors.secondary : (colors.warning || '#FFA500') }}>
+                    Elevation: {tripPlan.elevationRangeAdjustment > 0 ? '+' : ''}{tripPlan.elevationRangeAdjustment}% range
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Elevation Profile Chart */}
+        {tripPlan.elevationProfile && tripPlan.elevationProfile.points.length > 2 && (
+          <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+            <View style={{
+              backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
+              borderRadius: 16, padding: 16, overflow: 'hidden',
+            }}>
+              <Text style={{ ...typography.caption, color: colors.textSecondary, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 }}>
+                Elevation Profile
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 16, marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={{ fontSize: 12, color: colors.secondary }}>{'\u25B2'}</Text>
+                  <Text style={{ ...typography.mono, fontSize: 13, color: colors.secondary }}>{tripPlan.elevationProfile.totalAscent}m</Text>
+                  <Text style={{ ...typography.small, color: colors.textTertiary }}>ascent</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={{ fontSize: 12, color: colors.primary }}>{'\u25BC'}</Text>
+                  <Text style={{ ...typography.mono, fontSize: 13, color: colors.primary }}>{tripPlan.elevationProfile.totalDescent}m</Text>
+                  <Text style={{ ...typography.small, color: colors.textTertiary }}>descent</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={{ ...typography.mono, fontSize: 13, color: colors.textSecondary }}>{tripPlan.elevationProfile.minElevation}-{tripPlan.elevationProfile.maxElevation}m</Text>
+                </View>
+              </View>
+              {(() => {
+                const ep = tripPlan.elevationProfile!;
+                const cw = SCREEN_WIDTH - 72;
+                const ch = 100;
+                const pt = 8;
+                const pb = 20;
+                const dh = ch - pt - pb;
+                const er = Math.max(ep.maxElevation - ep.minElevation, 10);
+                const pts = ep.points.map((p, i) => {
+                  const x = (i / (ep.points.length - 1)) * cw;
+                  const y = pt + dh - ((p.elevation - ep.minElevation) / er) * dh;
+                  return `${x},${y}`;
+                }).join(' ');
+                const by = pt + dh;
+                const fp = `0,${by} ${pts} ${cw},${by}`;
+                return (
+                  <Svg width={cw} height={ch}>
+                    <Defs>
+                      <SvgLinearGradient id="elevFill" x1="0" y1="0" x2="0" y2="1">
+                        <Stop offset="0%" stopColor={colors.primary} stopOpacity="0.3" />
+                        <Stop offset="100%" stopColor={colors.primary} stopOpacity="0.02" />
+                      </SvgLinearGradient>
+                    </Defs>
+                    <Line x1={0} y1={pt} x2={cw} y2={pt} stroke={colors.border} strokeWidth="0.5" />
+                    <Line x1={0} y1={pt + dh / 2} x2={cw} y2={pt + dh / 2} stroke={colors.border} strokeWidth="0.5" strokeDasharray="4,4" />
+                    <Line x1={0} y1={by} x2={cw} y2={by} stroke={colors.border} strokeWidth="0.5" />
+                    <Polyline points={fp} fill="url(#elevFill)" stroke="none" />
+                    <Polyline points={pts} fill="none" stroke={colors.primary} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+                    <SvgText x={0} y={ch - 2} fill={colors.textTertiary} fontSize="9" textAnchor="start">0 km</SvgText>
+                    <SvgText x={cw / 2} y={ch - 2} fill={colors.textTertiary} fontSize="9" textAnchor="middle">{Math.round(tripPlan.totalDistance / 2)} km</SvgText>
+                    <SvgText x={cw} y={ch - 2} fill={colors.textTertiary} fontSize="9" textAnchor="end">{tripPlan.totalDistance} km</SvgText>
+                  </Svg>
+                );
+              })()}
+            </View>
+          </View>
+        )}
+
         {/* Route Timeline */}
         <View style={{ paddingHorizontal: 20 }}>
           <Text style={{ ...typography.h3, color: colors.text, marginBottom: 16 }}>
@@ -1272,6 +1624,42 @@ export function TripPlannerScreen({ navigation }: any) {
               {batteryLevel}% battery
             </Text>
           </View>
+
+          {/* Waypoint segment info (if waypoints exist) */}
+          {tripPlan.waypoints && tripPlan.waypoints.length > 0 && (
+            <View style={{ marginLeft: 5, marginBottom: 8 }}>
+              {/* Connecting line */}
+              <View style={{ width: 2, height: 12, backgroundColor: colors.primary, marginLeft: 5 }} />
+              {/* Segment badges */}
+              <View style={{ marginLeft: 24, flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 }}>
+                {tripPlan.waypoints.map((wp, wi) => (
+                  <View
+                    key={`seg-${wi}`}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 6,
+                      backgroundColor: colors.surfaceSecondary, borderRadius: 8,
+                      borderWidth: 1, borderColor: colors.border,
+                      paddingHorizontal: 10, paddingVertical: 6,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 20, height: 20, borderRadius: 10,
+                        backgroundColor: colors.accent || colors.primaryLight,
+                        justifyContent: 'center', alignItems: 'center',
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>{wi + 1}</Text>
+                    </View>
+                    <Text style={{ ...typography.small, color: colors.text, fontWeight: '600' }}>{wp.name}</Text>
+                    <Text style={{ ...typography.small, color: colors.textTertiary }}>
+                      {wp.segmentDistanceKm} km {'\u00B7'} {Math.floor(wp.segmentDurationMin / 60) > 0 ? `${Math.floor(wp.segmentDurationMin / 60)}h ` : ''}{wp.segmentDurationMin % 60}m
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
           {tripPlan.stops.map((stop, index) => (
             <View key={index} style={{ flexDirection: 'row' }}>
@@ -1523,7 +1911,7 @@ export function TripPlannerScreen({ navigation }: any) {
             onPress={() => {
               Alert.alert(
                 'Trip Saved! \u26A1',
-                `Your ${tripPlan?.from || ''} \u2192 ${tripPlan?.to || ''} trip with ${tripPlan?.stops.length || 0} charging stops has been saved.`,
+                `Your ${tripPlan?.from || ''}${tripPlan?.waypoints?.length ? ` \u2192 ${tripPlan.waypoints.map(w => w.name).join(' \u2192 ')}` : ''} \u2192 ${tripPlan?.to || ''} trip with ${tripPlan?.stops.length || 0} charging stops has been saved.`,
               );
             }}
             activeOpacity={0.85}

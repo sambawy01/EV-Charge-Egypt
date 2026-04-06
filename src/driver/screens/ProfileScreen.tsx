@@ -26,6 +26,7 @@ export function ProfileScreen({ navigation }: any) {
 
   const menuItems = [
     { label: t('my_vehicles'), icon: '🚗', screen: 'Vehicle' },
+    { label: t('cost_calculator'), icon: '🧮', screen: 'CostCalculator' },
     { label: t('favorites'), icon: '⭐', screen: 'Favorites' },
     { label: t('settings'), icon: '⚙️', screen: 'Settings' },
   ];

@@ -1,7 +1,7 @@
 import { supabase } from '../config/supabase';
 import { useAuthStore } from '../stores/authStore';
 
-export type StationStatus = 'available' | 'busy' | 'out_of_service' | 'partially_available';
+export type StationStatus = 'available' | 'busy' | 'out_of_service' | 'partially_available' | 'iced';
 
 export interface StationReport {
   id: string;
@@ -11,6 +11,7 @@ export interface StationReport {
   available_spots: number | null;
   total_spots: number | null;
   comment: string | null;
+  photos: string[];
   created_at: string;
 }
 
@@ -80,6 +81,48 @@ function buildLiveStatus(reports: StationReport[]): StationLiveStatus {
 }
 
 export const stationReportService = {
+  async uploadPhotos(
+    stationId: string,
+    photoUris: string[],
+  ): Promise<string[]> {
+    const urls: string[] = [];
+    const timestamp = Date.now();
+
+    for (let i = 0; i < photoUris.length; i++) {
+      const uri = photoUris[i];
+      try {
+        // Fetch the image as a blob
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const filePath = `${stationId}/${timestamp}_${i}.jpg`;
+
+        const { error } = await supabase.storage
+          .from('station-photos')
+          .upload(filePath, blob, {
+            contentType: 'image/jpeg',
+            upsert: false,
+          });
+
+        if (error) {
+          console.warn('[stationReportService] Photo upload failed:', error);
+          continue;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from('station-photos')
+          .getPublicUrl(filePath);
+
+        if (publicUrlData?.publicUrl) {
+          urls.push(publicUrlData.publicUrl);
+        }
+      } catch (err) {
+        console.warn('[stationReportService] Photo upload error:', err);
+      }
+    }
+
+    return urls;
+  },
+
   async submitReport(report: {
     stationId: string;
     userId?: string;
@@ -87,6 +130,7 @@ export const stationReportService = {
     availableSpots?: number;
     totalSpots?: number;
     comment?: string;
+    photos?: string[];
   }): Promise<boolean> {
     if (isRateLimited()) {
       console.warn('[stationReportService] Rate limited — max 5 reports per minute');
@@ -97,6 +141,12 @@ export const stationReportService = {
     const effectiveUserId = report.userId || useAuthStore.getState().user?.id || 'anonymous';
 
     try {
+      // Upload photos if provided
+      let photoUrls: string[] = [];
+      if (report.photos && report.photos.length > 0) {
+        photoUrls = await this.uploadPhotos(report.stationId, report.photos);
+      }
+
       const { error } = await supabase.from('station_reports').insert({
         station_id: report.stationId,
         user_id: effectiveUserId,
@@ -104,6 +154,7 @@ export const stationReportService = {
         available_spots: report.availableSpots ?? null,
         total_spots: report.totalSpots ?? null,
         comment: report.comment?.slice(0, 500) || null,
+        photos: photoUrls,
       });
       if (error) throw error;
       // Invalidate cache
@@ -112,6 +163,28 @@ export const stationReportService = {
     } catch (err) {
       console.warn('[stationReportService] Submit failed:', err);
       return false;
+    }
+  },
+
+  async getPhotosForStation(stationId: string): Promise<string[]> {
+    try {
+      const { data, error } = await supabase
+        .from('station_reports')
+        .select('photos')
+        .eq('station_id', stationId)
+        .not('photos', 'eq', '{}')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      const allPhotos: string[] = [];
+      for (const row of data || []) {
+        if (row.photos && Array.isArray(row.photos)) {
+          allPhotos.push(...row.photos);
+        }
+      }
+      return allPhotos;
+    } catch {
+      return [];
     }
   },
 

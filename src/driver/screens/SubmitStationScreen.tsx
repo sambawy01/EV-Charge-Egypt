@@ -28,6 +28,7 @@ export function SubmitStationScreen({ navigation }: any) {
   const [longitude, setLongitude] = useState('');
   const [connectorTypes, setConnectorTypes] = useState<string[]>([]);
   const [powerKw, setPowerKw] = useState('');
+  const [operatingHours, setOperatingHours] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -101,6 +102,7 @@ export function SubmitStationScreen({ navigation }: any) {
       providerName: providerName.trim() || undefined,
       connectorTypes: connectorTypes.length > 0 ? connectorTypes : undefined,
       powerKw: powerKw ? parseFloat(powerKw) : undefined,
+      operatingHours: operatingHours.trim() || undefined,
       notes: notes.trim() || undefined,
     });
     setSubmitting(false);
@@ -116,6 +118,7 @@ export function SubmitStationScreen({ navigation }: any) {
       setLongitude('');
       setConnectorTypes([]);
       setPowerKw('');
+      setOperatingHours('');
       setNotes('');
       loadPendingStations();
     } else {
@@ -291,11 +294,21 @@ export function SubmitStationScreen({ navigation }: any) {
         keyboardType="numeric"
       />
 
+      {/* Operating Hours */}
+      <Text style={styles.label}>Operating Hours</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="e.g. 24/7, 6AM-10PM, Sun-Thu 8AM-8PM"
+        placeholderTextColor={colors.textTertiary}
+        value={operatingHours}
+        onChangeText={setOperatingHours}
+      />
+
       {/* Notes */}
       <Text style={styles.label}>Notes</Text>
       <TextInput
         style={[styles.input, styles.textArea]}
-        placeholder="Any details about this station (operating hours, parking info, etc.)"
+        placeholder="Any details about this station (parking info, access instructions, etc.)"
         placeholderTextColor={colors.textTertiary}
         value={notes}
         onChangeText={setNotes}
