@@ -17,12 +17,13 @@ import {
   newRequestId,
 } from '../_shared/auth.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { callLlm, extractJson, LlmError } from '../_shared/llm.ts';
 
 const ALLOWED_PERIODS = ['week', 'month', 'quarter', 'year'] as const;
 type Period = (typeof ALLOWED_PERIODS)[number];
 
-const ANTHROPIC_TIMEOUT_MS = 20_000;
-const ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
+const LLM_TIMEOUT_MS = 20_000;
+const LLM_MODEL_LABEL = Deno.env.get('OLLAMA_MODEL') || 'gpt-oss:120b';
 
 function fallbackReport(period: Period) {
   return {
@@ -49,8 +50,8 @@ serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!supabaseUrl || !anonKey || !serviceKey || !anthropicKey) {
+  const llmKey = Deno.env.get('OLLAMA_API_KEY');
+  if (!supabaseUrl || !anonKey || !serviceKey || !llmKey) {
     console.error('[ai-cost-optimizer] missing env vars');
     return jsonError('Service misconfigured', 500, origin, requestId);
   }
@@ -147,49 +148,33 @@ Use EGP currency. Be specific about Egyptian providers and locations.`;
 
   let report: unknown = fallbackReport(periodValue);
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 2048,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+    const result = await callLlm({
+      caller: 'ai-cost-optimizer',
+      timeoutMs: LLM_TIMEOUT_MS,
+      maxTokens: 1024,
+      temperature: 0,
+      messages: [{ role: 'user', content: prompt }],
     });
-    if (!response.ok) {
-      const t = await response.text().catch(() => '<no body>');
+    const parsed = extractJson(result.text);
+    if (parsed) {
+      report = parsed;
+    } else {
       console.error(
-        `[ai-cost-optimizer] anthropic ${response.status} reqId=${requestId}: ${t.slice(0, 500)}`,
+        `[ai-cost-optimizer] JSON extract failed reqId=${requestId}: ${result.text.slice(0, 200)}`,
       );
-      return jsonError('AI service unavailable', 502, origin, requestId);
-    }
-    const aiResponse = await response.json();
-    const text: string =
-      aiResponse?.content?.[0]?.type === 'text'
-        ? aiResponse.content[0].text
-        : '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        report = JSON.parse(jsonMatch[0]);
-      } catch (e) {
-        console.error(
-          `[ai-cost-optimizer] JSON parse failed reqId=${requestId}:`,
-          e,
-        );
-        report = fallbackReport(periodValue);
-      }
+      report = fallbackReport(periodValue);
     }
   } catch (e) {
-    console.error(
-      `[ai-cost-optimizer] anthropic call failed reqId=${requestId}:`,
-      e,
-    );
+    if (e instanceof LlmError) {
+      console.error(
+        `[ai-cost-optimizer] llm ${e.status} reqId=${requestId}: ${e.body.slice(0, 500)}`,
+      );
+    } else {
+      console.error(
+        `[ai-cost-optimizer] llm call failed reqId=${requestId}:`,
+        e,
+      );
+    }
     return jsonError('AI service unavailable', 502, origin, requestId);
   }
 
@@ -200,7 +185,7 @@ Use EGP currency. Be specific about Egyptian providers and locations.`;
       type: 'cost_optimizer',
       input: periodValue,
       output: JSON.stringify(report),
-      model_used: ANTHROPIC_MODEL,
+      model_used: LLM_MODEL_LABEL,
     })
     .then(({ error }) => {
       if (error) {

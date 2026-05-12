@@ -15,9 +15,10 @@ import {
   stripControlChars,
 } from '../_shared/auth.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
+import { callLlm, extractJson, LlmError } from '../_shared/llm.ts';
 
-const ANTHROPIC_TIMEOUT_MS = 20_000;
-const ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
+const LLM_TIMEOUT_MS = 20_000;
+const LLM_MODEL_LABEL = Deno.env.get('OLLAMA_MODEL') || 'gpt-oss:120b';
 
 function fallbackHealth(fastChargeRatio: number) {
   return {
@@ -43,8 +44,8 @@ serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!supabaseUrl || !anonKey || !serviceKey || !anthropicKey) {
+  const llmKey = Deno.env.get('OLLAMA_API_KEY');
+  if (!supabaseUrl || !anonKey || !serviceKey || !llmKey) {
     console.error('[ai-battery-health] missing env vars');
     return jsonError('Service misconfigured', 500, origin, requestId);
   }
@@ -149,49 +150,33 @@ Return JSON: { "score": number (0-100), "fastChargeRatio": number, "avgDepthOfDi
 
   let health: unknown = fallbackHealth(fastChargeRatio);
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 1024,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+    const result = await callLlm({
+      caller: 'ai-battery-health',
+      timeoutMs: LLM_TIMEOUT_MS,
+      maxTokens: 1024,
+      temperature: 0,
+      messages: [{ role: 'user', content: prompt }],
     });
-    if (!response.ok) {
-      const t = await response.text().catch(() => '<no body>');
+    const parsed = extractJson(result.text);
+    if (parsed) {
+      health = parsed;
+    } else {
       console.error(
-        `[ai-battery-health] anthropic ${response.status} reqId=${requestId}: ${t.slice(0, 500)}`,
+        `[ai-battery-health] JSON extract failed reqId=${requestId}: ${result.text.slice(0, 200)}`,
       );
-      return jsonError('AI service unavailable', 502, origin, requestId);
-    }
-    const aiResponse = await response.json();
-    const text: string =
-      aiResponse?.content?.[0]?.type === 'text'
-        ? aiResponse.content[0].text
-        : '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        health = JSON.parse(jsonMatch[0]);
-      } catch (e) {
-        console.error(
-          `[ai-battery-health] JSON parse failed reqId=${requestId}:`,
-          e,
-        );
-        health = fallbackHealth(fastChargeRatio);
-      }
+      health = fallbackHealth(fastChargeRatio);
     }
   } catch (e) {
-    console.error(
-      `[ai-battery-health] anthropic call failed reqId=${requestId}:`,
-      e,
-    );
+    if (e instanceof LlmError) {
+      console.error(
+        `[ai-battery-health] llm ${e.status} reqId=${requestId}: ${e.body.slice(0, 500)}`,
+      );
+    } else {
+      console.error(
+        `[ai-battery-health] llm call failed reqId=${requestId}:`,
+        e,
+      );
+    }
     return jsonError('AI service unavailable', 502, origin, requestId);
   }
 
@@ -202,7 +187,7 @@ Return JSON: { "score": number (0-100), "fastChargeRatio": number, "avgDepthOfDi
       type: 'battery_health',
       input: vehicleId,
       output: JSON.stringify(health),
-      model_used: ANTHROPIC_MODEL,
+      model_used: LLM_MODEL_LABEL,
     })
     .then(({ error }) => {
       if (error) {

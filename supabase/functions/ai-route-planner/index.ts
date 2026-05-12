@@ -19,9 +19,10 @@ import {
 } from '../_shared/auth.ts';
 import { checkRateLimit } from '../_shared/rateLimit.ts';
 import { filterStationsToCorridor } from '../_shared/geo.ts';
+import { callLlm, extractJson, LlmError } from '../_shared/llm.ts';
 
-const ANTHROPIC_TIMEOUT_MS = 20_000;
-const ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
+const LLM_TIMEOUT_MS = 20_000;
+const LLM_MODEL_LABEL = Deno.env.get('OLLAMA_MODEL') || 'gpt-oss:120b';
 
 const MAX_PLACE_LEN = 500;
 const CORRIDOR_KM = 50;
@@ -68,8 +69,8 @@ serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
-  if (!supabaseUrl || !anonKey || !serviceKey || !anthropicKey) {
+  const llmKey = Deno.env.get('OLLAMA_API_KEY');
+  if (!supabaseUrl || !anonKey || !serviceKey || !llmKey) {
     console.error('[ai-route-planner] missing env vars');
     return jsonError('Service misconfigured', 500, origin, requestId);
   }
@@ -245,49 +246,33 @@ Consider: realistic range at highway speeds (~150Wh/km with AC), arrive at each 
 
   let routePlan: unknown = fallbackRoute();
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
-        max_tokens: 2048,
-        messages: [{ role: 'user', content: prompt }],
-      }),
+    const result = await callLlm({
+      caller: 'ai-route-planner',
+      timeoutMs: LLM_TIMEOUT_MS,
+      maxTokens: 1500,
+      temperature: 0,
+      messages: [{ role: 'user', content: prompt }],
     });
-    if (!response.ok) {
-      const t = await response.text().catch(() => '<no body>');
+    const parsed = extractJson(result.text);
+    if (parsed) {
+      routePlan = parsed;
+    } else {
       console.error(
-        `[ai-route-planner] anthropic ${response.status} reqId=${requestId}: ${t.slice(0, 500)}`,
+        `[ai-route-planner] JSON extract failed reqId=${requestId}: ${result.text.slice(0, 200)}`,
       );
-      return jsonError('AI service unavailable', 502, origin, requestId);
-    }
-    const aiResponse = await response.json();
-    const text: string =
-      aiResponse?.content?.[0]?.type === 'text'
-        ? aiResponse.content[0].text
-        : '';
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        routePlan = JSON.parse(jsonMatch[0]);
-      } catch (e) {
-        console.error(
-          `[ai-route-planner] JSON parse failed reqId=${requestId}:`,
-          e,
-        );
-        routePlan = fallbackRoute();
-      }
+      routePlan = fallbackRoute();
     }
   } catch (e) {
-    console.error(
-      `[ai-route-planner] anthropic call failed reqId=${requestId}:`,
-      e,
-    );
+    if (e instanceof LlmError) {
+      console.error(
+        `[ai-route-planner] llm ${e.status} reqId=${requestId}: ${e.body.slice(0, 500)}`,
+      );
+    } else {
+      console.error(
+        `[ai-route-planner] llm call failed reqId=${requestId}:`,
+        e,
+      );
+    }
     return jsonError('AI service unavailable', 502, origin, requestId);
   }
 
@@ -303,7 +288,7 @@ Consider: realistic range at highway speeds (~150Wh/km with AC), arrive at each 
         currentBatteryPct,
       }),
       output: JSON.stringify(routePlan),
-      model_used: ANTHROPIC_MODEL,
+      model_used: LLM_MODEL_LABEL,
     })
     .then(({ error }) => {
       if (error) {
