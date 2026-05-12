@@ -141,15 +141,36 @@ export function MapScreen({ navigation }: any) {
     homeChargerService.listHomeChargers().then(setHomeChargers);
   }, []);
 
-  // Listen for messages from the map iframe (station clicks + status reports)
+  // Listen for messages from the map iframe (station clicks + status reports).
+  // The iframe is same-origin (built via doc.write in WebMap), so legitimate
+  // messages have event.origin === window.location.origin. Anything from a
+  // cross-origin embedder or a popup with window.opener is rejected here.
   useEffect(() => {
+    const expectedOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+    const allowedStationIdRe = /^[a-zA-Z0-9_-]{1,64}$/;
+    const allowedStatuses = ['available', 'partially_available', 'busy', 'out_of_service'];
+
     const handleMessage = (event: MessageEvent) => {
+      // Cross-origin attacker check: reject anything that didn't come from
+      // our own origin. The same-origin iframe and our own popups pass this.
+      if (event.origin && event.origin !== expectedOrigin) return;
+
       const data = event.data;
       if (!data || typeof data !== 'object') return;
-      if (data.type === 'stationClick' && data.stationId) {
-        navigation.navigate('StationDetail', { stationId: data.stationId });
+
+      // Validate stationId shape at the boundary (whitelist).
+      const stationId = typeof data.stationId === 'string' && allowedStationIdRe.test(data.stationId)
+        ? data.stationId
+        : null;
+      if (!stationId) return;
+
+      if (data.type === 'stationClick') {
+        navigation.navigate('StationDetail', { stationId });
+        return;
       }
-      if (data.type === 'statusReport' && data.stationId && data.status) {
+      if (data.type === 'statusReport' && typeof data.status === 'string' && allowedStatuses.includes(data.status)) {
+        // Reassign normalized values so downstream code uses validated inputs.
+        data.stationId = stationId;
         // Proximity check — must be within 100m
         if (userLocation && data.lat && data.lng) {
           const R = 6371000;

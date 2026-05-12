@@ -5,28 +5,37 @@
  *  1. OpenStreetMap Overpass API (free, no key)
  *  2. OpenChargeMap API (if OCM_API_KEY is set)
  *
- * Upserts results into the stations/connectors tables.
- * Can be invoked on a cron schedule or manually.
+ * Upserts results into the stations/connectors tables. Runs on a cron
+ * schedule (not invoked from clients).
+ *
+ * Security:
+ *  - Requires `x-cron-secret: <SYNC_CRON_SECRET>` header. No JWT auth, since
+ *    pg_cron / external schedulers cannot mint user JWTs.
+ *  - The deactivation step that flips legacy seeded stations to is_active=false
+ *    is GATED behind explicit `?deactivate=true&dryRun=false` query params —
+ *    it can no longer fire accidentally on every run.
  *
  * Environment variables:
  *   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (auto-provided)
  *   OCM_API_KEY (optional, for OpenChargeMap source)
+ *   SYNC_CRON_SECRET (required — shared secret with the scheduler)
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import { corsHeaders, jsonError, newRequestId } from '../_shared/auth.ts';
 
 const OVERPASS_API = 'https://overpass-api.de/api/interpreter';
 const OCM_API = 'https://api.openchargemap.io/v3/poi/';
 const REAL_DATA_PROVIDER_ID = '11111111-0000-0000-0000-00000000000a';
 
 const CONN_TYPE_MAP: Record<number, string> = {
-  1: 'Type2', 2: 'CHAdeMO', 25: 'Type2', 33: 'CCS', 32: 'CCS', 30: 'CCS',
+  1: 'Type2',
+  2: 'CHAdeMO',
+  25: 'Type2',
+  33: 'CCS',
+  32: 'CCS',
+  30: 'CCS',
 };
 
 interface StationData {
@@ -58,72 +67,95 @@ async function fetchOverpass(): Promise<StationData[]> {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: query,
+    signal: AbortSignal.timeout(30_000),
   });
   if (!resp.ok) throw new Error(`Overpass ${resp.status}`);
 
   const data = await resp.json();
   const elements: any[] = data.elements || [];
 
-  return elements.map((el: any) => {
-    const tags = el.tags || {};
-    const lat = el.lat ?? el.center?.lat;
-    const lon = el.lon ?? el.center?.lon;
-    if (!lat || !lon) return null;
+  return elements
+    .map((el: any) => {
+      const tags = el.tags || {};
+      const lat = el.lat ?? el.center?.lat;
+      const lon = el.lon ?? el.center?.lon;
+      if (!lat || !lon) return null;
 
-    const socketTypes = [
-      { prefix: 'socket:type2', type: 'Type2' },
-      { prefix: 'socket:ccs2', type: 'CCS' },
-      { prefix: 'socket:ccs', type: 'CCS' },
-      { prefix: 'socket:chademo', type: 'CHAdeMO' },
-    ];
+      const socketTypes = [
+        { prefix: 'socket:type2', type: 'Type2' },
+        { prefix: 'socket:ccs2', type: 'CCS' },
+        { prefix: 'socket:ccs', type: 'CCS' },
+        { prefix: 'socket:chademo', type: 'CHAdeMO' },
+      ];
 
-    const connectors: StationData['connectors'] = [];
-    let connIdx = 0;
+      const connectors: StationData['connectors'] = [];
+      let connIdx = 0;
 
-    for (const { prefix, type } of socketTypes) {
-      if (tags[prefix] !== undefined) {
-        const qty = parseInt(tags[prefix] || '1', 10) || 1;
-        const outputTag = tags[`${prefix}:output`] || '';
-        const pwMatch = outputTag.match(/([\d.]+)\s*kW/i);
-        const pw = pwMatch ? parseFloat(pwMatch[1]) : (type === 'CCS' ? 50 : 22);
-        for (let i = 0; i < qty; i++) {
-          connectors.push({
-            externalId: `OSM-${el.id}-${type}-${connIdx}`,
-            type,
-            powerKw: pw,
-            status: 'available',
-          });
-          connIdx++;
+      for (const { prefix, type } of socketTypes) {
+        if (tags[prefix] !== undefined) {
+          const qty = parseInt(tags[prefix] || '1', 10) || 1;
+          const outputTag = tags[`${prefix}:output`] || '';
+          const pwMatch = outputTag.match(/([\d.]+)\s*kW/i);
+          const pw = pwMatch
+            ? parseFloat(pwMatch[1])
+            : type === 'CCS'
+              ? 50
+              : 22;
+          for (let i = 0; i < qty; i++) {
+            connectors.push({
+              externalId: `OSM-${el.id}-${type}-${connIdx}`,
+              type,
+              powerKw: pw,
+              status: 'available',
+            });
+            connIdx++;
+          }
         }
       }
-    }
 
-    if (connectors.length === 0) {
-      const cap = parseInt(tags['capacity'] || tags['capacity:motorcar'] || '1', 10);
-      for (let i = 0; i < Math.min(cap, 4); i++) {
-        connectors.push({
-          externalId: `OSM-${el.id}-generic-${i}`,
-          type: 'Type2',
-          powerKw: 22,
-          status: 'available',
-        });
+      if (connectors.length === 0) {
+        const cap = parseInt(
+          tags['capacity'] || tags['capacity:motorcar'] || '1',
+          10,
+        );
+        for (let i = 0; i < Math.min(cap, 4); i++) {
+          connectors.push({
+            externalId: `OSM-${el.id}-generic-${i}`,
+            type: 'Type2',
+            powerKw: 22,
+            status: 'available',
+          });
+        }
       }
-    }
 
-    return {
-      source: 'osm',
-      externalId: `OSM-${el.id}`,
-      name: tags['name'] || tags['operator'] || tags['network'] || `EV Station (OSM ${el.id})`,
-      address: [tags['addr:street'], tags['addr:city'], tags['addr:state'], tags['location']]
-        .filter(Boolean).join(', ') || tags['location'] || null,
-      latitude: lat,
-      longitude: lon,
-      city: tags['addr:city'] || null,
-      area: tags['addr:state'] || tags['addr:city'] || null,
-      isActive: true,
-      connectors,
-    } as StationData;
-  }).filter(Boolean) as StationData[];
+      return {
+        source: 'osm',
+        externalId: `OSM-${el.id}`,
+        name:
+          tags['name'] ||
+          tags['operator'] ||
+          tags['network'] ||
+          `EV Station (OSM ${el.id})`,
+        address:
+          [
+            tags['addr:street'],
+            tags['addr:city'],
+            tags['addr:state'],
+            tags['location'],
+          ]
+            .filter(Boolean)
+            .join(', ') ||
+          tags['location'] ||
+          null,
+        latitude: lat,
+        longitude: lon,
+        city: tags['addr:city'] || null,
+        area: tags['addr:state'] || tags['addr:city'] || null,
+        isActive: true,
+        connectors,
+      } as StationData;
+    })
+    .filter(Boolean) as StationData[];
 }
 
 // ---------------------------------------------------------------------------
@@ -132,12 +164,20 @@ async function fetchOverpass(): Promise<StationData[]> {
 
 async function fetchOCM(apiKey: string): Promise<StationData[]> {
   const params = new URLSearchParams({
-    output: 'json', countrycode: 'EG', maxresults: '1000',
-    compact: 'true', verbose: 'false', key: apiKey,
+    output: 'json',
+    countrycode: 'EG',
+    maxresults: '1000',
+    compact: 'true',
+    verbose: 'false',
+    key: apiKey,
   });
 
   const resp = await fetch(`${OCM_API}?${params}`, {
-    headers: { 'User-Agent': 'EVChargeEgypt-Sync/1.0', Accept: 'application/json' },
+    headers: {
+      'User-Agent': 'EVChargeEgypt-Sync/1.0',
+      Accept: 'application/json',
+    },
+    signal: AbortSignal.timeout(30_000),
   });
   if (!resp.ok) throw new Error(`OCM ${resp.status}`);
 
@@ -155,13 +195,25 @@ async function fetchOCM(apiKey: string): Promise<StationData[]> {
       source: 'ocm',
       externalId: `OCM-${ocm.ID}`,
       name: addr.Title || `Station OCM-${ocm.ID}`,
-      address: [addr.AddressLine1, addr.Town, addr.StateOrProvince].filter(Boolean).join(', ') || null,
+      address:
+        [addr.AddressLine1, addr.Town, addr.StateOrProvince]
+          .filter(Boolean)
+          .join(', ') || null,
       latitude: addr.Latitude,
       longitude: addr.Longitude,
       city: addr.Town || null,
       area: addr.StateOrProvince || addr.Town || null,
       isActive: ocm.StatusType?.IsOperational !== false,
-      connectors: conns.length ? conns : [{ externalId: `OCM-GEN-${ocm.ID}`, type: 'Type2', powerKw: 22, status: 'available' }],
+      connectors: conns.length
+        ? conns
+        : [
+            {
+              externalId: `OCM-GEN-${ocm.ID}`,
+              type: 'Type2',
+              powerKw: 22,
+              status: 'available',
+            },
+          ],
     } as StationData;
   });
 }
@@ -170,24 +222,75 @@ async function fetchOCM(apiKey: string): Promise<StationData[]> {
 // Edge function handler
 // ---------------------------------------------------------------------------
 
-serve(async (req) => {
+/**
+ * Constant-time string compare to mitigate timing attacks on the cron secret.
+ */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+serve(async (req: Request) => {
+  const origin = req.headers.get('origin');
+  const requestId = req.headers.get('x-request-id') ?? newRequestId();
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders(origin) });
+  }
+  if (req.method !== 'POST' && req.method !== 'GET') {
+    return jsonError('Method not allowed', 405, origin, requestId);
   }
 
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const ocmKey = Deno.env.get('OCM_API_KEY') || '';
-    const supabase = createClient(supabaseUrl, supabaseKey);
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const cronSecret = Deno.env.get('SYNC_CRON_SECRET');
+  const ocmKey = Deno.env.get('OCM_API_KEY') || '';
 
+  if (!supabaseUrl || !supabaseKey) {
+    console.error('[sync-ocm-stations] missing supabase env');
+    return jsonError('Service misconfigured', 500, origin, requestId);
+  }
+  if (!cronSecret) {
+    console.error('[sync-ocm-stations] SYNC_CRON_SECRET not set');
+    return jsonError('Service misconfigured', 500, origin, requestId);
+  }
+
+  // Auth: shared-secret header. No JWT — this is a scheduler endpoint.
+  const provided = req.headers.get('x-cron-secret') ?? '';
+  if (!provided || !safeEqual(provided, cronSecret)) {
+    return jsonError('Unauthorized', 401, origin, requestId);
+  }
+
+  // Query-param flags
+  const url = new URL(req.url);
+  const dryRun = url.searchParams.get('dryRun') !== 'false'; // default true
+  const deactivate = url.searchParams.get('deactivate') === 'true'; // default false
+
+  const supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  });
+
+  try {
     // Ensure provider row exists
     await supabase.from('providers').upsert(
-      { id: REAL_DATA_PROVIDER_ID, name: 'Real Data (OSM+OCM)', slug: 'real-data', adapter_type: 'aggregated', is_active: true },
-      { onConflict: 'slug' }
+      {
+        id: REAL_DATA_PROVIDER_ID,
+        name: 'Real Data (OSM+OCM)',
+        slug: 'real-data',
+        adapter_type: 'aggregated',
+        is_active: true,
+      },
+      { onConflict: 'slug' },
     );
 
-    // Fetch from all sources
     const allStations: StationData[] = [];
 
     try {
@@ -195,7 +298,7 @@ serve(async (req) => {
       allStations.push(...osmData);
       console.log(`Overpass: ${osmData.length} stations`);
     } catch (e) {
-      console.error('Overpass failed:', e);
+      console.error('[sync-ocm-stations] Overpass failed:', e);
     }
 
     if (ocmKey) {
@@ -204,7 +307,7 @@ serve(async (req) => {
         allStations.push(...ocmData);
         console.log(`OCM: ${ocmData.length} stations`);
       } catch (e) {
-        console.error('OCM failed:', e);
+        console.error('[sync-ocm-stations] OCM failed:', e);
       }
     }
 
@@ -212,81 +315,111 @@ serve(async (req) => {
     const unique: StationData[] = [];
     for (const s of allStations) {
       const dup = unique.some(
-        (u) => Math.abs(u.latitude - s.latitude) < 0.001 && Math.abs(u.longitude - s.longitude) < 0.001
+        (u) =>
+          Math.abs(u.latitude - s.latitude) < 0.001 &&
+          Math.abs(u.longitude - s.longitude) < 0.001,
       );
       if (!dup) unique.push(s);
     }
 
-    // Upsert into database
     let upsertedStations = 0;
     let upsertedConnectors = 0;
+    let deactivatedCount = 0;
 
-    for (const s of unique) {
-      const { data: station, error: stationErr } = await supabase
-        .from('stations')
-        .upsert({
-          provider_id: REAL_DATA_PROVIDER_ID,
-          external_station_id: s.externalId,
-          name: s.name,
-          address: s.address,
-          latitude: s.latitude,
-          longitude: s.longitude,
-          city: s.city,
-          area: s.area,
-          is_active: s.isActive,
-          last_synced_at: new Date().toISOString(),
-        }, { onConflict: 'provider_id,external_station_id' })
-        .select('id')
-        .single();
+    if (!dryRun) {
+      for (const s of unique) {
+        const { data: station, error: stationErr } = await supabase
+          .from('stations')
+          .upsert(
+            {
+              provider_id: REAL_DATA_PROVIDER_ID,
+              external_station_id: s.externalId,
+              name: s.name,
+              address: s.address,
+              latitude: s.latitude,
+              longitude: s.longitude,
+              city: s.city,
+              area: s.area,
+              is_active: s.isActive,
+              last_synced_at: new Date().toISOString(),
+            },
+            { onConflict: 'provider_id,external_station_id' },
+          )
+          .select('id')
+          .single();
 
-      if (stationErr || !station) {
-        console.error(`Failed to upsert ${s.externalId}:`, stationErr);
-        continue;
+        if (stationErr || !station) {
+          console.error(
+            `[sync-ocm-stations] Failed to upsert ${s.externalId}:`,
+            stationErr,
+          );
+          continue;
+        }
+        upsertedStations++;
+
+        for (const c of s.connectors) {
+          const { error: connErr } = await supabase.from('connectors').upsert(
+            {
+              station_id: station.id,
+              external_connector_id: c.externalId,
+              type: c.type,
+              power_kw: c.powerKw,
+              price_per_kwh: 0,
+              status: c.status,
+              last_status_check: new Date().toISOString(),
+            },
+            { onConflict: 'station_id,external_connector_id' },
+          );
+          if (!connErr) upsertedConnectors++;
+        }
       }
-      upsertedStations++;
 
-      for (const c of s.connectors) {
-        const { error: connErr } = await supabase
-          .from('connectors')
-          .upsert({
-            station_id: station.id,
-            external_connector_id: c.externalId,
-            type: c.type,
-            power_kw: c.powerKw,
-            price_per_kwh: 0,
-            status: c.status,
-            last_status_check: new Date().toISOString(),
-          }, { onConflict: 'station_id,external_connector_id' });
-        if (!connErr) upsertedConnectors++;
+      // Destructive: only run when explicitly opted in.
+      if (deactivate) {
+        const { data: deactivated, error: deactErr } = await supabase
+          .from('stations')
+          .update({ is_active: false })
+          .neq('provider_id', REAL_DATA_PROVIDER_ID)
+          .is('last_synced_at', null)
+          .select('id');
+        if (deactErr) {
+          console.error(
+            '[sync-ocm-stations] deactivate step failed:',
+            deactErr,
+          );
+        } else {
+          deactivatedCount = deactivated?.length ?? 0;
+        }
       }
     }
 
-    // Deactivate old seeded stations that were never synced from a real source
-    await supabase
-      .from('stations')
-      .update({ is_active: false })
-      .neq('provider_id', REAL_DATA_PROVIDER_ID)
-      .is('last_synced_at', null);
-
     const summary = {
+      requestId,
+      dryRun,
+      deactivate,
       sources_tried: ocmKey ? ['overpass', 'ocm'] : ['overpass'],
       total_fetched: allStations.length,
       deduplicated: unique.length,
       stations_upserted: upsertedStations,
       connectors_upserted: upsertedConnectors,
+      stations_deactivated: deactivatedCount,
       synced_at: new Date().toISOString(),
     };
 
-    console.log('Sync complete:', summary);
+    console.log('[sync-ocm-stations] complete:', summary);
 
     return new Response(JSON.stringify(summary), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+      headers: {
+        ...corsHeaders(origin),
+        'Content-Type': 'application/json',
+      },
     });
   } catch (err) {
-    console.error('sync-ocm-stations error:', err);
-    return new Response(
-      JSON.stringify({ error: (err as Error).message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    console.error(
+      `[sync-ocm-stations] error reqId=${requestId}:`,
+      (err as Error).message,
     );
+    return jsonError('Sync failed', 500, origin, requestId);
   }
 });

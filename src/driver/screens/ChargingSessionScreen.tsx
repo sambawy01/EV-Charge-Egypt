@@ -16,19 +16,8 @@ export function ChargingSessionScreen({ route, navigation }: any) {
   const [startTime] = useState(Date.now());
   const [isStopping, setIsStopping] = useState(false);
 
-  // Simulate charging progress locally (in real app, comes from provider via Edge Function)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setLocalKwh((prev) => {
-        const newKwh = prev + (connectorPowerKw / 3600) * 5; // 5 second intervals
-        setLocalCost(newKwh * pricePerKwh + 10);
-        return newKwh;
-      });
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [connectorPowerKw, pricePerKwh]);
-
-  // Update from realtime if available
+  // kWh/cost come exclusively from the realtime subscription against the
+  // charging_sessions row updated by the provider's session webhook.
   useEffect(() => {
     if (realtimeSession) {
       setLocalKwh(realtimeSession.kwh_delivered);

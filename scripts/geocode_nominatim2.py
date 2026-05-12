@@ -6,13 +6,19 @@ Updates stations where Nominatim returns a significantly better location (>1km d
 
 import json
 import math
+import os
 import time
 import urllib.parse
 import urllib.request
 import sys
 
-SUPABASE_URL = "https://plpwojwnzueigukmjidw.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBscHdvanduenVlaWd1a21qaWR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NTM3NjMsImV4cCI6MjA5MDEyOTc2M30.EL5xCe0Xp2CEUAoyLfawkllgBcc5V8gNsbISiXACV-g"
+# Required env vars:
+#   SUPABASE_URL              e.g. https://your-project.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY service-role key from Supabase dashboard
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+if not SUPABASE_URL or not SUPABASE_KEY:
+    sys.exit("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars are required")
 
 # Egypt bounding box
 EG_LAT_MIN, EG_LAT_MAX = 22.0, 31.7

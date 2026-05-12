@@ -31,18 +31,8 @@ export function SettingsScreen({ navigation }: any) {
           onToggle={setNotifications}
         />
 
-        <Text style={styles.section}>Payment</Text>
-        <SettingsRow icon="💳" label="Payment Methods" onPress={() => {}} />
-        <SettingsRow icon="💰" label="Auto Top-Up" onPress={() => {}} />
-
-        <Text style={styles.section}>Privacy</Text>
-        <SettingsRow icon="🔒" label="Change Password" onPress={() => {}} />
-        <SettingsRow icon="📋" label="Privacy Policy" onPress={() => {}} />
-        <SettingsRow icon="📄" label="Terms of Service" onPress={() => {}} />
-
         <Text style={styles.section}>About</Text>
         <SettingsRow icon="ℹ️" label="App Version" value="1.0.0" />
-        <SettingsRow icon="📧" label="Contact Support" onPress={() => {}} />
       </ScrollView>
     </View>
   );

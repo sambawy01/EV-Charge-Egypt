@@ -10,5 +10,6 @@ module.exports = {
     '^expo/src/winter$': '<rootDir>/__mocks__/expo-winter.js',
     '^expo/src/winter/(.*)$': '<rootDir>/__mocks__/expo-winter.js',
   },
+  setupFiles: ['<rootDir>/jest.setup.js'],
   setupFilesAfterFramework: ['@testing-library/jest-native/extend-expect'],
 };

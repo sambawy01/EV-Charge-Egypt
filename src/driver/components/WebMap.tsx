@@ -67,6 +67,23 @@ function computeInitialView(
   return { lat, lng, zoom };
 }
 
+// JSON-encode safely for embedding inside an inline <script>. Escapes `<` so
+// that a value containing "</script>" cannot terminate the script block.
+function safeJson(value: unknown): string {
+  return JSON.stringify(value).replace(/</g, '\\u003c');
+}
+
+// Match the UUID/slug-shape station IDs we issue. Anything else is rejected
+// before reaching the iframe so it can never end up as a selector value or in
+// a postMessage payload.
+const ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+function safeId(id: unknown): string {
+  return typeof id === 'string' && ID_RE.test(id) ? id : '';
+}
+function safeNum(n: unknown): number | null {
+  return typeof n === 'number' && isFinite(n) ? n : null;
+}
+
 function buildMapHtml(
   stations: Station[],
   userLocation?: { latitude: number; longitude: number } | null,
@@ -74,42 +91,49 @@ function buildMapHtml(
 ): string {
   const { lat, lng, zoom } = computeInitialView(stations, userLocation);
 
-  const markersJson = JSON.stringify(
-    stations.map((s) => ({
-      id: s.id,
-      name: s.name,
-      address: s.address ?? '',
-      provider: (s as any).provider?.name ?? '',
-      latitude: s.latitude,
-      longitude: s.longitude,
-      status: s.status ?? 'offline',
-      color: STATUS_COLOR[s.status ?? 'offline'] ?? '#5A6482',
-      distance: s.distance_km != null ? s.distance_km.toFixed(1) + ' km' : '',
-      connectors: (s.connectors || [])
-        .map((c) => c.type + ' ' + c.power_kw + 'kW')
-        .join(', '),
-      verified: (s as any).is_verified || false,
-    }))
+  // Validate IDs and coordinates BEFORE serialization so the iframe never
+  // receives data it would have to re-validate. Strings still need escaping
+  // when inserted into HTML (the iframe does that).
+  const markersJson = safeJson(
+    stations
+      .filter((s) => safeId(s.id) && safeNum(s.latitude) !== null && safeNum(s.longitude) !== null)
+      .map((s) => ({
+        id: s.id,
+        name: String(s.name ?? ''),
+        address: String(s.address ?? ''),
+        provider: String((s as any).provider?.name ?? ''),
+        latitude: s.latitude,
+        longitude: s.longitude,
+        status: s.status ?? 'offline',
+        color: STATUS_COLOR[s.status ?? 'offline'] ?? '#5A6482',
+        distance: s.distance_km != null ? s.distance_km.toFixed(1) + ' km' : '',
+        connectors: (s.connectors || [])
+          .map((c) => String(c.type ?? '') + ' ' + String(c.power_kw ?? '') + 'kW')
+          .join(', '),
+        verified: (s as any).is_verified || false,
+      }))
   );
 
-  const homeChargersJson = JSON.stringify(
-    (homeChargers || []).map((hc) => ({
-      id: hc.id,
-      name: hc.display_name,
-      address: hc.address,
-      latitude: hc.latitude,
-      longitude: hc.longitude,
-      connectorType: hc.connector_type,
-      powerKw: hc.power_kw,
-      schedule: hc.availability_schedule || '',
-      isFree: hc.is_free,
-      pricePerKwh: hc.price_per_kwh,
-      description: hc.description || '',
-    }))
+  const homeChargersJson = safeJson(
+    (homeChargers || [])
+      .filter((hc) => safeId(hc.id) && safeNum(hc.latitude) !== null && safeNum(hc.longitude) !== null)
+      .map((hc) => ({
+        id: hc.id,
+        name: String(hc.display_name ?? ''),
+        address: String(hc.address ?? ''),
+        latitude: hc.latitude,
+        longitude: hc.longitude,
+        connectorType: String(hc.connector_type ?? ''),
+        powerKw: hc.power_kw,
+        schedule: String(hc.availability_schedule || ''),
+        isFree: hc.is_free,
+        pricePerKwh: hc.price_per_kwh,
+        description: String(hc.description || ''),
+      }))
   );
 
   const userLocJson = userLocation
-    ? JSON.stringify({ lat: userLocation.latitude, lng: userLocation.longitude })
+    ? safeJson({ lat: userLocation.latitude, lng: userLocation.longitude })
     : 'null';
 
   // If no API key, fall back to OpenStreetMap via Leaflet
@@ -141,6 +165,15 @@ html,body,#map{width:100%;height:100%;background:#0A0E1A}
 var stations=${markersJson};
 var homeChargers=${homeChargersJson};
 var userLoc=${userLocJson};
+
+// HTML-escape any user-controlled string before inserting it as innerHTML.
+// Covers all 5 metacharacters that can break out of attribute or text context.
+function esc(s){
+  if(s==null) return '';
+  return String(s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
 
 var DARK_STYLE=[
   {elementType:'geometry',stylers:[{color:'#0A0E1A'}]},
@@ -175,18 +208,21 @@ function createMarkerIcon(color,isHighlighted){
 }
 
 function createInfoContent(s){
-  var navUrl='https://www.google.com/maps/dir/?api=1&destination='+s.latitude+','+s.longitude+'&travelmode=driving';
+  // encodeURIComponent prevents query-string injection via the destination param.
+  // (s.id/s.lat/s.lng already validated by safeId/safeNum on the parent side.)
+  var navUrl='https://www.google.com/maps/dir/?api=1&destination='+
+             encodeURIComponent(s.latitude+','+s.longitude)+'&travelmode=driving';
   return '<div style="background:#141B2D;color:#F0F4FF;padding:14px;border-radius:12px;min-width:280px;max-width:320px;font-family:system-ui,-apple-system,sans-serif;">' +
     // Clickable station name — posts message to parent for navigation
     '<div onclick="window.parent.postMessage({type:\\'stationClick\\',stationId:\\''+s.id+'\\'},\\'*\\')" style="cursor:pointer;">' +
-      '<div style="font-weight:700;font-size:15px;margin-bottom:4px;color:#F0F4FF;">' + s.name + (s.verified ? ' <span style="color:#00D4FF;font-size:12px;">\u2713 Verified</span>' : '') + ' <span style="font-size:11px;color:#00D4FF;">\u2192</span></div>' +
-      '<div style="font-size:12px;color:#8892B0;margin-bottom:2px;">' + s.provider + '</div>' +
-      (s.address ? '<div style="font-size:11px;color:#5A6482;margin-bottom:4px;">' + s.address + '</div>' : '') +
+      '<div style="font-weight:700;font-size:15px;margin-bottom:4px;color:#F0F4FF;">' + esc(s.name) + (s.verified ? ' <span style="color:#00D4FF;font-size:12px;">\u2713 Verified</span>' : '') + ' <span style="font-size:11px;color:#00D4FF;">\u2192</span></div>' +
+      '<div style="font-size:12px;color:#8892B0;margin-bottom:2px;">' + esc(s.provider) + '</div>' +
+      (s.address ? '<div style="font-size:11px;color:#5A6482;margin-bottom:4px;">' + esc(s.address) + '</div>' : '') +
     '</div>' +
-    (s.connectors ? '<div style="font-size:11px;color:#F0F4FF;margin-bottom:4px;">' + s.connectors + '</div>' : '') +
-    (s.distance ? '<div style="font-size:11px;color:#00D4FF;font-weight:600;margin-bottom:6px;">' + s.distance + ' away</div>' : '') +
+    (s.connectors ? '<div style="font-size:11px;color:#F0F4FF;margin-bottom:4px;">' + esc(s.connectors) + '</div>' : '') +
+    (s.distance ? '<div style="font-size:11px;color:#00D4FF;font-weight:600;margin-bottom:6px;">' + esc(s.distance) + ' away</div>' : '') +
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
-      '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#FFFFFF;background:' + s.color + ';">' + s.status + '</span>' +
+      '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#FFFFFF;background:' + esc(s.color) + ';">' + esc(s.status) + '</span>' +
     '</div>' +
     // Status report buttons — include lat/lng for proximity check
     '<div style="margin-bottom:10px;">' +
@@ -201,7 +237,7 @@ function createInfoContent(s){
     // Action buttons row
     '<div style="display:flex;gap:8px;">' +
       '<div onclick="window.parent.postMessage({type:\\'stationClick\\',stationId:\\''+s.id+'\\'},\\'*\\')" style="flex:1;text-align:center;padding:10px;background:#1C2438;border:1px solid #2A3350;color:#00D4FF;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;">ℹ️ Details</div>' +
-      '<a href="' + navUrl + '" target="_blank" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#00D4FF,#8B5CF6,#D946EF);color:#FFFFFF;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;">📍 Navigate</a>' +
+      '<a href="' + esc(navUrl) + '" target="_blank" rel="noopener noreferrer" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#00D4FF,#8B5CF6,#D946EF);color:#FFFFFF;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;">📍 Navigate</a>' +
     '</div>' +
     '</div>';
 }
@@ -321,21 +357,23 @@ function initMap(){
   }
 
   function createHomeChargerInfo(hc){
+    var navUrl='https://www.google.com/maps/dir/?api=1&destination='+
+               encodeURIComponent(hc.latitude+','+hc.longitude)+'&travelmode=driving';
     return '<div style="background:#141B2D;color:#F0F4FF;padding:14px;border-radius:12px;min-width:260px;max-width:300px;font-family:system-ui,-apple-system,sans-serif;">' +
       '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
         '<span style="font-size:18px;">&#127968;</span>' +
-        '<span style="font-weight:700;font-size:15px;color:#F0F4FF;">' + hc.name + '</span>' +
+        '<span style="font-weight:700;font-size:15px;color:#F0F4FF;">' + esc(hc.name) + '</span>' +
       '</div>' +
-      '<div style="font-size:12px;color:#8892B0;margin-bottom:6px;">' + hc.address + '</div>' +
+      '<div style="font-size:12px;color:#8892B0;margin-bottom:6px;">' + esc(hc.address) + '</div>' +
       '<div style="display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap;">' +
-        '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#00D4FF;background:#00D4FF15;border:1px solid #00D4FF40;">' + hc.connectorType + '</span>' +
-        '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#00D4FF;background:#00D4FF15;border:1px solid #00D4FF40;">' + hc.powerKw + ' kW</span>' +
-        '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:' + (hc.isFree ? '#00FF88' : '#FFB020') + ';background:' + (hc.isFree ? '#00FF8815' : '#FFB02015') + ';border:1px solid ' + (hc.isFree ? '#00FF8840' : '#FFB02040') + ';">' + (hc.isFree ? 'Free' : hc.pricePerKwh + ' EGP/kWh') + '</span>' +
+        '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#00D4FF;background:#00D4FF15;border:1px solid #00D4FF40;">' + esc(hc.connectorType) + '</span>' +
+        '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:#00D4FF;background:#00D4FF15;border:1px solid #00D4FF40;">' + esc(String(hc.powerKw)) + ' kW</span>' +
+        '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;color:' + (hc.isFree ? '#00FF88' : '#FFB020') + ';background:' + (hc.isFree ? '#00FF8815' : '#FFB02015') + ';border:1px solid ' + (hc.isFree ? '#00FF8840' : '#FFB02040') + ';">' + (hc.isFree ? 'Free' : esc(String(hc.pricePerKwh)) + ' EGP/kWh') + '</span>' +
       '</div>' +
-      (hc.schedule ? '<div style="font-size:11px;color:#8892B0;margin-bottom:6px;">&#128340; ' + hc.schedule + '</div>' : '') +
-      (hc.description ? '<div style="font-size:11px;color:#5A6482;margin-bottom:6px;">' + hc.description + '</div>' : '') +
+      (hc.schedule ? '<div style="font-size:11px;color:#8892B0;margin-bottom:6px;">&#128340; ' + esc(hc.schedule) + '</div>' : '') +
+      (hc.description ? '<div style="font-size:11px;color:#5A6482;margin-bottom:6px;">' + esc(hc.description) + '</div>' : '') +
       '<div style="display:flex;gap:8px;">' +
-        '<a href="https://www.google.com/maps/dir/?api=1&destination=' + hc.latitude + ',' + hc.longitude + '&travelmode=driving" target="_blank" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#00FF88,#00D4FF);color:#000;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;">&#128205; Navigate</a>' +
+        '<a href="' + esc(navUrl) + '" target="_blank" rel="noopener noreferrer" style="flex:1;text-align:center;padding:10px;background:linear-gradient(135deg,#00FF88,#00D4FF);color:#000;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;">&#128205; Navigate</a>' +
       '</div>' +
     '</div>';
   }

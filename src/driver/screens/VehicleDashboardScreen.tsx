@@ -120,9 +120,7 @@ export function VehicleDashboardScreen({ navigation }: any) {
   const [analysis, setAnalysis] = useState<VehicleAnalysis | null>(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
 
-  // If demo mode and no vehicles, use a demo vehicle
-  const isDemoUser = user?.id === 'demo-user';
-  const activeVehicles = vehicles?.length ? vehicles : (isDemoUser ? [DEMO_VEHICLE] : []);
+  const activeVehicles = vehicles ?? [];
 
   // Auto-select first vehicle
   useEffect(() => {
@@ -257,6 +255,38 @@ export function VehicleDashboardScreen({ navigation }: any) {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {/* Demo data banner — shown while analytics are simulated estimates */}
+      {analysis.isDemo && (
+        <View
+          style={{
+            marginHorizontal: 20,
+            marginBottom: 8,
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: colors.warning,
+            backgroundColor: colors.warning + '15',
+          }}
+        >
+          <Text
+            style={{
+              ...typography.caption,
+              color: colors.warning,
+              fontWeight: '700',
+              marginBottom: 2,
+            }}
+          >
+            Demo data
+          </Text>
+          <Text style={{ ...typography.caption, color: colors.textSecondary, fontSize: 11 }}>
+            Battery health, consumption and charging-pattern numbers below are
+            estimates based on EV spec + age, not measured telemetry. Connect a
+            real charging session to see live analytics.
+          </Text>
+        </View>
+      )}
 
       {/* ============================================================ */}
       {/* VEHICLE SELECTOR                                             */}

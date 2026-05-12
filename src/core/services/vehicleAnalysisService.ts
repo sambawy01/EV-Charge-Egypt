@@ -1,4 +1,19 @@
 import { evDatabase, EVModel } from '../data/evDatabase';
+import { featureFlags } from '../config/featureFlags';
+
+/**
+ * IMPORTANT — DEMO DATA NOTICE
+ *
+ * While `featureFlags.SIMULATED_VEHICLE_ANALYSIS` is true, the values returned
+ * by this service are NOT measured telemetry — they are deterministic
+ * pseudo-random estimates derived from EV spec data + vehicle age. They are
+ * suitable for design, prototyping, and demos, but MUST be labelled as such
+ * in the UI (`analysis.isDemo === true`) and MUST NOT be presented as
+ * AI-derived measurements.
+ *
+ * To swap in real analytics: query `charging_sessions` aggregates per-vehicle
+ * and replace the rand()-driven sections below. Then flip the flag to false.
+ */
 
 export interface BatteryHealthReport {
   healthScore: number; // 0-100
@@ -44,6 +59,12 @@ export interface VehicleAnalysis {
   charging: ChargingPatternsReport;
   insights: AIInsight[];
   lastUpdated: string;
+  /**
+   * True when the analysis was produced by simulated/estimated data rather
+   * than measured telemetry. The UI MUST display a clear "demo" badge in
+   * this case. Driven by `featureFlags.SIMULATED_VEHICLE_ANALYSIS`.
+   */
+  isDemo: boolean;
 }
 
 // Deterministic pseudo-random based on string seed
@@ -190,6 +211,7 @@ export const vehicleAnalysisService = {
       charging,
       insights,
       lastUpdated: new Date().toISOString(),
+      isDemo: featureFlags.SIMULATED_VEHICLE_ANALYSIS,
     };
   },
 };

@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
-# Geocode all 'geocoded' stations via Nominatim and update if result is better
+# Geocode all 'geocoded' stations via Nominatim and update if result is better.
+#
+# Required env vars:
+#   SUPABASE_URL              e.g. https://your-project.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY service-role key from Supabase dashboard
+#
+# Usage:
+#   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... ./scripts/geocode_nominatim.sh
 
-SUPABASE_URL="https://plpwojwnzueigukmjidw.supabase.co"
-SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBscHdvanduenVlaWd1a21qaWR3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NTM3NjMsImV4cCI6MjA5MDEyOTc2M30.EL5xCe0Xp2CEUAoyLfawkllgBcc5V8gNsbISiXACV-g"
+: "${SUPABASE_URL:?SUPABASE_URL env var is required}"
+: "${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY env var is required}"
+SUPABASE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
 
 echo "Stations with geocoded source — querying Nominatim..."
 echo ""

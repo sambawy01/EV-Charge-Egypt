@@ -1,97 +1,220 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+/**
+ * ai-battery-health
+ *
+ * Estimate battery health based on charging history. Read-only, AI-backed.
+ */
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { serve } from 'https://deno.land/std@0.208.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.4';
+import {
+  corsHeaders,
+  getAuthedUser,
+  isUuid,
+  jsonError,
+  newRequestId,
+  stripControlChars,
+} from '../_shared/auth.ts';
+import { checkRateLimit } from '../_shared/rateLimit.ts';
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+const ANTHROPIC_TIMEOUT_MS = 20_000;
+const ANTHROPIC_MODEL = 'claude-sonnet-4-20250514';
 
+function fallbackHealth(fastChargeRatio: number) {
+  return {
+    score: 85,
+    fastChargeRatio,
+    avgDepthOfDischarge: 0.6,
+    recommendations: ['Insufficient data for analysis.'],
+    degradationEstimate: 'N/A',
+  };
+}
+
+serve(async (req: Request) => {
+  const origin = req.headers.get('origin');
+  const requestId = req.headers.get('x-request-id') ?? newRequestId();
+
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders(origin) });
+  }
+  if (req.method !== 'POST') {
+    return jsonError('Method not allowed', 405, origin, requestId);
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY');
+  if (!supabaseUrl || !anonKey || !serviceKey || !anthropicKey) {
+    console.error('[ai-battery-health] missing env vars');
+    return jsonError('Service misconfigured', 500, origin, requestId);
+  }
+
+  const auth = await getAuthedUser(req, supabaseUrl, anonKey);
+  if ('error' in auth) return auth.error;
+  const { user, userClient } = auth;
+
+  const svc = createClient(supabaseUrl, serviceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  });
+
+  const allowed = await checkRateLimit(
+    svc,
+    user.id,
+    'ai-battery-health',
+    10,
+    60,
+  );
+  if (!allowed) {
+    return jsonError('Rate limit exceeded (10/min)', 429, origin, requestId);
+  }
+
+  let body: unknown;
   try {
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+    body = await req.json();
+  } catch {
+    return jsonError('Invalid JSON body', 400, origin, requestId);
+  }
+  if (!body || typeof body !== 'object') {
+    return jsonError('Invalid body', 400, origin, requestId);
+  }
+  const { vehicleId } = body as Record<string, unknown>;
+  if (!isUuid(vehicleId)) {
+    return jsonError('vehicleId must be a UUID', 400, origin, requestId);
+  }
+
+  // RLS ensures the user can only fetch their own vehicle.
+  const { data: vehicle, error: vehErr } = await userClient
+    .from('vehicles')
+    .select('make, model, battery_capacity_kwh')
+    .eq('id', vehicleId)
+    .maybeSingle();
+  if (vehErr) {
+    console.error(
+      `[ai-battery-health] vehicle query failed reqId=${requestId}:`,
+      vehErr.message,
     );
+    return jsonError('Failed to load vehicle', 500, origin, requestId);
+  }
+  if (!vehicle) {
+    return jsonError('Vehicle not found', 404, origin, requestId);
+  }
 
-    const { userId, vehicleId } = await req.json();
+  const { data: sessions, error: sessErr } = await userClient
+    .from('charging_sessions')
+    .select('start_time, kwh_delivered, connector:connectors(power_kw)')
+    .eq('user_id', user.id)
+    .not('end_time', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  if (sessErr) {
+    console.error(
+      `[ai-battery-health] sessions query failed reqId=${requestId}:`,
+      sessErr.message,
+    );
+    return jsonError('Failed to load sessions', 500, origin, requestId);
+  }
 
-    const { data: vehicle } = await supabase
-      .from('vehicles')
-      .select('*')
-      .eq('id', vehicleId)
-      .single();
-    const { data: sessions } = await supabase
-      .from('charging_sessions')
-      .select('*, connector:connectors(*)')
-      .eq('user_id', userId)
-      .not('end_time', 'is', null)
-      .order('created_at', { ascending: false })
-      .limit(50);
+  const sessionsArr = sessions ?? [];
+  const fastCharges = sessionsArr.filter(
+    (s: Record<string, unknown>) =>
+      (s.connector as { power_kw?: number } | null)?.power_kw !== undefined &&
+      Number((s.connector as { power_kw?: number }).power_kw) >= 50,
+  ).length;
+  const totalCharges = Math.max(sessionsArr.length, 1);
+  const fastChargeRatio = fastCharges / totalCharges;
 
-    const fastCharges = sessions?.filter((s: any) => s.connector?.power_kw >= 50).length || 0;
-    const totalCharges = sessions?.length || 1;
-    const fastChargeRatio = fastCharges / totalCharges;
+  const safeMake = stripControlChars(String(vehicle.make ?? '')).slice(0, 40);
+  const safeModel = stripControlChars(String(vehicle.model ?? '')).slice(0, 60);
+  const cap = Number(vehicle.battery_capacity_kwh);
+  const capStr = Number.isFinite(cap) ? `${cap}` : 'unknown';
 
-    const prompt = `Analyze this EV battery health based on charging patterns.
+  const prompt = `Analyze this EV battery health based on charging patterns.
 
-Vehicle: ${vehicle?.make} ${vehicle?.model}, ${vehicle?.battery_capacity_kwh}kWh
+Vehicle: ${safeMake} ${safeModel}, ${capStr}kWh
 Total sessions: ${totalCharges}
 Fast charge ratio: ${(fastChargeRatio * 100).toFixed(0)}%
 Sessions data: ${JSON.stringify(
-      sessions?.slice(0, 20).map((s: any) => ({
-        kwh: s.kwh_delivered,
-        powerKw: s.connector?.power_kw,
-        date: s.start_time,
-      })),
-    )}
+    sessionsArr.slice(0, 20).map((s: Record<string, unknown>) => ({
+      kwh: s.kwh_delivered,
+      powerKw: (s.connector as { power_kw?: number } | null)?.power_kw,
+      date: s.start_time,
+    })),
+  )}
 
 Return JSON: { "score": number (0-100), "fastChargeRatio": number, "avgDepthOfDischarge": number, "recommendations": ["..."], "degradationEstimate": "..." }`;
 
+  let health: unknown = fallbackHealth(fastChargeRatio);
+  try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: AbortSignal.timeout(ANTHROPIC_TIMEOUT_MS),
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
+        'x-api-key': anthropicKey,
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: ANTHROPIC_MODEL,
         max_tokens: 1024,
         messages: [{ role: 'user', content: prompt }],
       }),
     });
-
+    if (!response.ok) {
+      const t = await response.text().catch(() => '<no body>');
+      console.error(
+        `[ai-battery-health] anthropic ${response.status} reqId=${requestId}: ${t.slice(0, 500)}`,
+      );
+      return jsonError('AI service unavailable', 502, origin, requestId);
+    }
     const aiResponse = await response.json();
-    const text = aiResponse.content?.[0]?.text || '{}';
+    const text: string =
+      aiResponse?.content?.[0]?.type === 'text'
+        ? aiResponse.content[0].text
+        : '';
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    const health = jsonMatch
-      ? JSON.parse(jsonMatch[0])
-      : {
-          score: 85,
-          fastChargeRatio,
-          avgDepthOfDischarge: 0.6,
-          recommendations: ['Insufficient data for analysis.'],
-          degradationEstimate: 'N/A',
-        };
+    if (jsonMatch) {
+      try {
+        health = JSON.parse(jsonMatch[0]);
+      } catch (e) {
+        console.error(
+          `[ai-battery-health] JSON parse failed reqId=${requestId}:`,
+          e,
+        );
+        health = fallbackHealth(fastChargeRatio);
+      }
+    }
+  } catch (e) {
+    console.error(
+      `[ai-battery-health] anthropic call failed reqId=${requestId}:`,
+      e,
+    );
+    return jsonError('AI service unavailable', 502, origin, requestId);
+  }
 
-    await supabase.from('ai_interactions').insert({
-      user_id: userId,
+  svc
+    .from('ai_interactions')
+    .insert({
+      user_id: user.id,
       type: 'battery_health',
       input: vehicleId,
       output: JSON.stringify(health),
-      model_used: 'claude-sonnet-4-20250514',
+      model_used: ANTHROPIC_MODEL,
+    })
+    .then(({ error }) => {
+      if (error) {
+        console.error(
+          `[ai-battery-health] audit insert failed reqId=${requestId}:`,
+          error.message,
+        );
+      }
     });
 
-    return new Response(JSON.stringify(health), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  return new Response(JSON.stringify(health), {
+    status: 200,
+    headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
+  });
 });

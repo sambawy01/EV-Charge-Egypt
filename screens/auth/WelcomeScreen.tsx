@@ -1,30 +1,16 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Button } from '@/core/components';
 import { useTheme } from '@/core/theme';
-import { useAuthStore } from '@/core/stores/authStore';
 import { useTranslation } from '@/core/i18n';
 import { spacing } from '@/core/theme/spacing';
 import { typography } from '@/core/theme/typography';
 
 export function WelcomeScreen({ navigation }: any) {
   const { colors } = useTheme();
-  const { setUser } = useAuthStore();
   const { t, isRTL } = useTranslation();
 
-  const handleDemoMode = () => {
-    setUser({
-      id: 'demo-user',
-      role: 'driver',
-      full_name: 'Demo Driver',
-      phone: null,
-      avatar_url: null,
-      preferred_lang: 'en',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    } as any);
-  };
   const glowAnim = useRef(new Animated.Value(0.6)).current;
   const fadeIn = useRef(new Animated.Value(0)).current;
   const slideUp = useRef(new Animated.Value(30)).current;
@@ -175,11 +161,6 @@ export function WelcomeScreen({ navigation }: any) {
           onPress={() => navigation.navigate('Login')}
           variant="ghost"
         />
-        <TouchableOpacity onPress={handleDemoMode} style={{ marginTop: 8, alignItems: 'center' }}>
-          <Text style={{ ...typography.caption, color: colors.primary, textDecorationLine: 'underline' }}>
-            {t('explore_demo')}
-          </Text>
-        </TouchableOpacity>
       </Animated.View>
     </LinearGradient>
   );
