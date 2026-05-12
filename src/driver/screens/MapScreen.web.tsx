@@ -131,14 +131,23 @@ export function MapScreen({ navigation }: any) {
 
   // Home chargers state
   const [homeChargers, setHomeChargers] = useState<HomeCharger[]>([]);
+  const [homeChargersLoaded, setHomeChargersLoaded] = useState(false);
   const [showHomeChargers, setShowHomeChargers] = useState(true);
 
-  // Load default filter preset + home chargers on mount
+  // Load default filter preset + home chargers on mount.
+  // We deliberately track homeChargersLoaded and block the WebMap mount on it
+  // (see render guard below): without this, WebMap mounts with homeChargers=[]
+  // and re-renders ~100ms later when the fetch resolves, tearing down the
+  // Google Maps iframe mid-load and leaving a blank map until the user reloads.
   useEffect(() => {
     loadDefaultPreset().then((defaultFilter) => {
       if (defaultFilter) setFilters(defaultFilter);
     });
-    homeChargerService.listHomeChargers().then(setHomeChargers);
+    homeChargerService
+      .listHomeChargers()
+      .then((rows) => setHomeChargers(rows))
+      .catch(() => setHomeChargers([]))
+      .finally(() => setHomeChargersLoaded(true));
   }, []);
 
   // Listen for messages from the map iframe (station clicks + status reports).
@@ -283,7 +292,11 @@ export function MapScreen({ navigation }: any) {
   const { width: screenWidth } = useWindowDimensions();
   const isMobile = screenWidth < 768;
 
-  if (!gpsResolved || isLoading) return <LoadingScreen message="Finding your location..." />;
+  // Wait for: location resolved, stations loaded, AND home chargers loaded.
+  // All three must be ready before WebMap mounts, otherwise the iframe gets
+  // torn down and rebuilt mid-Google-Maps-load and the map fails to display.
+  if (!gpsResolved || isLoading || !homeChargersLoaded)
+    return <LoadingScreen message="Finding your location..." />;
 
   const panelTitle = buildPanelTitle(filteredStations, searchQuery, userLocation);
 
