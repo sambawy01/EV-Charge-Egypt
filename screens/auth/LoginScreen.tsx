@@ -26,14 +26,28 @@ export function LoginScreen({ navigation }: any) {
   const { colors } = useTheme();
 
   const handleForgotPassword = async () => {
-    if (!email.trim()) {
+    const trimmed = email.trim();
+    if (!trimmed) {
       Alert.alert('Email Required', 'Please enter your email address first.');
       return;
     }
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim());
+      // redirectTo must be on the project's "Redirect URLs" allowlist in
+      // Supabase Auth settings, otherwise the email link will land on a
+      // generic error page. We send users back to /reset-password (handled
+      // by the web app via detectSessionInUrl + PASSWORD_RECOVERY event).
+      const redirectTo =
+        Platform.OS === 'web' && typeof window !== 'undefined'
+          ? `${window.location.origin}/?recovery=1`
+          : 'wattsonev://reset-password';
+      const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+        redirectTo,
+      });
       if (error) throw error;
-      Alert.alert('Password Reset', 'Check your email for a password reset link.');
+      Alert.alert(
+        'Password Reset',
+        'Check your email for a password reset link. The link is valid for 1 hour.',
+      );
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Could not send reset email.');
     }

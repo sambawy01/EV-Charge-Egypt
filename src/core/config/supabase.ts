@@ -38,6 +38,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: ExpoSecureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // On web, parse `#access_token=...&type=recovery` from the URL hash so the
+    // password-reset email link signs the user in (with the recovery flag set)
+    // and AuthProvider can route them to the ResetPasswordScreen. Native uses
+    // deep links via expo-linking and doesn't want auto URL parsing here.
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });

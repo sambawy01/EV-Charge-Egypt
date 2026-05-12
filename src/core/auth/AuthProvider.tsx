@@ -3,7 +3,7 @@ import { useAuthStore } from '../stores/authStore';
 import { authService } from './authService';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setSession, clearUser, setLoading } = useAuthStore();
+  const { setUser, setSession, clearUser, setLoading, setPasswordRecovery } = useAuthStore();
 
   useEffect(() => {
     // Initialize auth state from existing session.
@@ -63,6 +63,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setUser(profile!);
         setSession(session);
+      } else if (event === 'PASSWORD_RECOVERY') {
+        // The user just clicked their password-reset email link. Supabase has
+        // signed them in with a recovery-scope session; flip the flag so the
+        // RootNavigator forces them onto ResetPasswordScreen before they can
+        // do anything else. ResetPasswordScreen clears the flag on success.
+        setPasswordRecovery(true);
       } else if (event === 'SIGNED_OUT') {
         clearUser();
       }

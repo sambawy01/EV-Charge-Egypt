@@ -10,7 +10,7 @@ import { DriverNavigator } from './DriverNavigator';
 import { FleetNavigator } from './FleetNavigator';
 
 export function RootNavigator() {
-  const { isAuthenticated, isLoading, user } = useAuthStore();
+  const { isAuthenticated, isLoading, user, inPasswordRecovery } = useAuthStore();
   const { colors, isDark } = useTheme();
   const { currentBadge, dismiss } = useBadgeStore();
 
@@ -31,10 +31,16 @@ export function RootNavigator() {
     return <LoadingScreen message="Starting WattsOn..." />;
   }
 
+  // Password-recovery mode supersedes the role-based routing: even though
+  // the recovery session is technically authenticated, force the user onto
+  // ResetPasswordScreen until they pick a new password. The Auth stack is
+  // mounted with that as the initial route.
   return (
     <>
       <NavigationContainer theme={navTheme}>
-        {!isAuthenticated ? (
+        {inPasswordRecovery ? (
+          <AuthNavigator initialRouteName="ResetPassword" />
+        ) : !isAuthenticated ? (
           <AuthNavigator />
         ) : user?.role === 'fleet_manager' ? (
           <FleetNavigator />
