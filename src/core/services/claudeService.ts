@@ -86,22 +86,30 @@ ${stationList}
     const systemPrompt = this.buildSystemPrompt(context);
 
     // --- 1. Try Supabase Edge Function first (server-side, API key is safe) ---
+    // Note: the hardened ai-chat function ignores client-supplied `system` and
+    // `userId` for safety (system prompt is fixed server-side, userId is derived
+    // from the verified JWT). The Cairo-specific context built by
+    // buildSystemPrompt() is therefore not used by the server — the server's own
+    // system prompt covers the EV-charging assistant role. We keep the local
+    // build for the keyword-fallback path below.
     try {
       const { supabase } = await import('../config/supabase');
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
           message: userMessage,
-          system: systemPrompt,
           history: conversationHistory.slice(-10),
         },
       });
-      if (!error && data?.response) {
-        return data.response;
+      if (!error && typeof data?.message === 'string' && data.message.length > 0) {
+        return data.message;
       }
       // If edge function returned an error or unexpected shape, fall through
     } catch {
       // Edge function unavailable — fall through to keyword-based fallback
     }
+    // Reference systemPrompt to silence unused-variable warning; kept above so
+    // future refactors that re-enable client-side prompts have an obvious hook.
+    void systemPrompt;
 
     // --- 2. Fallback: keyword-based response ---
     return this.fallbackResponse(userMessage);
