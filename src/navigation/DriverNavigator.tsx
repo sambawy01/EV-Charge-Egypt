@@ -11,9 +11,19 @@ import { useVehicles } from '@/core/queries/useVehicles';
 // Existing screens
 import { MapScreen } from '@/driver/screens/MapScreen';
 import { StationDetailScreen } from '@/driver/screens/StationDetailScreen';
-// Booking/Wallet/ChargingSession screens are intentionally not wired into navigation:
-// the platform is an aggregator (no in-app booking/payment) until an OCPI provider
-// integration is live. Screens remain in the repo for future re-enablement.
+
+// Wallet + Bookings + Charging stack — payment endpoint is now hardened
+// (JWT auth, ownership check, idempotency, atomic balance via RPC). Real
+// gateway integration (Paymob/Fawry) is still TODO: PAYMENT_GATEWAY_MODE
+// defaults to "simulate" so wallet top-ups currently credit without
+// charging a real card. Flip to "live" only after webhook integration.
+import { BookingScreen } from '@/driver/screens/BookingScreen';
+import { ChargingSessionScreen } from '@/driver/screens/ChargingSessionScreen';
+import { BookingsListScreen } from '@/driver/screens/BookingsListScreen';
+import { BookingDetailScreen } from '@/driver/screens/BookingDetailScreen';
+import { WalletScreen } from '@/driver/screens/WalletScreen';
+import { TopUpScreen } from '@/driver/screens/TopUpScreen';
+import { TransactionHistoryScreen } from '@/driver/screens/TransactionHistoryScreen';
 
 // Plan 5: AI Layer screens
 import { AIAssistantScreen } from '@/driver/screens/AIAssistantScreen';
@@ -51,6 +61,8 @@ import { MyHomeChargersScreen } from '@/driver/screens/MyHomeChargersScreen';
 
 const Tab = createBottomTabNavigator();
 const MapStack = createNativeStackNavigator();
+const BookingsStack = createNativeStackNavigator();
+const WalletStack = createNativeStackNavigator();
 const AIStack = createNativeStackNavigator();
 const VehicleStack = createNativeStackNavigator();
 const NewsStack = createNativeStackNavigator();
@@ -61,9 +73,32 @@ function MapTabStack() {
     <MapStack.Navigator screenOptions={{ headerShown: false }}>
       <MapStack.Screen name="Map" component={MapScreen} />
       <MapStack.Screen name="StationDetail" component={StationDetailScreen} />
+      <MapStack.Screen name="Booking" component={BookingScreen} />
+      <MapStack.Screen name="ChargingSession" component={ChargingSessionScreen} />
+      <MapStack.Screen name="BookingDetail" component={BookingDetailScreen} />
       <MapStack.Screen name="SubmitStation" component={SubmitStationScreen} />
       <MapStack.Screen name="ListHomeCharger" component={ListHomeChargerScreen} />
     </MapStack.Navigator>
+  );
+}
+
+function BookingsTabStack() {
+  return (
+    <BookingsStack.Navigator screenOptions={{ headerShown: false }}>
+      <BookingsStack.Screen name="BookingsList" component={BookingsListScreen} />
+      <BookingsStack.Screen name="BookingDetail" component={BookingDetailScreen} />
+      <BookingsStack.Screen name="ChargingSession" component={ChargingSessionScreen} />
+    </BookingsStack.Navigator>
+  );
+}
+
+function WalletTabStack() {
+  return (
+    <WalletStack.Navigator screenOptions={{ headerShown: false }}>
+      <WalletStack.Screen name="Wallet" component={WalletScreen} />
+      <WalletStack.Screen name="TopUp" component={TopUpScreen} />
+      <WalletStack.Screen name="TransactionHistory" component={TransactionHistoryScreen} />
+    </WalletStack.Navigator>
   );
 }
 
@@ -233,6 +268,7 @@ function InlineTabs({ state, descriptors, navigation }: any) {
     { name: 'MapTab', icon: '\u{1F4CD}', label: t('map') },
     { name: 'AITab', icon: '\u{1F916}', label: t('ai') },
     { name: 'NewsTab', icon: '\u{1F4F0}', label: t('news') },
+    { name: 'WalletTab', icon: '\u{1F4B3}', label: t('wallet') },
     { name: 'VehicleTab', icon: '\u{1F697}', label: t('vehicle') },
     { name: 'ProfileTab', icon: '\u{1F464}', label: t('profile') },
   ];
@@ -375,8 +411,17 @@ export function DriverNavigator() {
       <Tab.Screen name="MapTab" component={MapTabStack} />
       <Tab.Screen name="AITab" component={AITabStack} />
       <Tab.Screen name="NewsTab" component={NewsTabStack} />
+      <Tab.Screen name="WalletTab" component={WalletTabStack} />
       <Tab.Screen name="VehicleTab" component={VehicleTabStack} />
       <Tab.Screen name="ProfileTab" component={ProfileTabStack} />
+      {/* BookingsTab is registered but not visible in the tab bar — reached
+          programmatically from ChargingSessionScreen via navigation.replace.
+          Hide it by setting tabBarButton: () => null. */}
+      <Tab.Screen
+        name="BookingsTab"
+        component={BookingsTabStack}
+        options={{ tabBarButton: () => null }}
+      />
     </Tab.Navigator>
   );
 }

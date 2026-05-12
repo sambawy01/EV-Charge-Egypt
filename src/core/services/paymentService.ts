@@ -5,16 +5,29 @@ interface TopUpInput {
   walletId: string;
   amount: number;
   method: PaymentMethod;
+  /**
+   * Optional caller-supplied idempotency key. If omitted, paymentService
+   * generates a fresh one with crypto.randomUUID(). The hardened
+   * process-payment Edge Function REQUIRES this — it rejects the request
+   * with 400 otherwise — and uses it to dedupe replays so a network retry
+   * never double-credits the wallet.
+   */
+  idempotencyKey?: string;
 }
 
 interface TopUpResult {
   success: boolean;
   transactionId: string;
   newBalance: number;
+  /** True when the request was a replay (matched a prior idempotency key). */
+  duplicate?: boolean;
+  /** True while the gateway integration is still in simulate mode. */
+  simulated?: boolean;
 }
 
 export const paymentService = {
   async topUp(input: TopUpInput): Promise<TopUpResult> {
+    const idempotencyKey = input.idempotencyKey ?? crypto.randomUUID();
     const { data, error } = await supabase.functions.invoke(
       'process-payment',
       {
@@ -23,11 +36,31 @@ export const paymentService = {
           amount: input.amount,
           method: input.method,
           type: 'topup',
+          idempotencyKey,
         },
       },
     );
     if (error) throw error;
-    return data;
+    // The hardened process-payment Edge Function wraps its payload in a
+    // top-level `data` field. supabase.functions.invoke does NOT unwrap that
+    // (it returns the entire JSON body under its own `data` key), so we have
+    // to dereference once. Some replay paths or future shape tweaks may also
+    // return the payload at the top level, so fall back to `data` itself.
+    const payload = (data && typeof data === 'object' && 'data' in data
+      ? (data as { data: Record<string, unknown> }).data
+      : data) as {
+      transactionId: string;
+      newBalance: number;
+      duplicate?: boolean;
+      simulated?: boolean;
+    };
+    return {
+      success: true,
+      transactionId: payload.transactionId,
+      newBalance: payload.newBalance,
+      duplicate: payload.duplicate,
+      simulated: payload.simulated,
+    };
   },
 
   async setupAutoTopUp(
