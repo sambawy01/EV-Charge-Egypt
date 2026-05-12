@@ -22,34 +22,64 @@ export function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [forgotBusy, setForgotBusy] = useState(false);
+  /** Inline status surface for the forgot-password flow. RN's Alert.alert
+   *  no-ops in some react-native-web builds, so we render feedback in the
+   *  DOM directly. */
+  const [forgotStatus, setForgotStatus] = useState<
+    { kind: 'success' | 'error'; message: string } | null
+  >(null);
   const { signIn, isLoading } = useAuth();
   const { colors } = useTheme();
 
   const handleForgotPassword = async () => {
+    console.log('[forgot-password] tapped');
+    if (forgotBusy) return; // prevent double-fire
+    setForgotStatus(null);
     const trimmed = email.trim();
     if (!trimmed) {
-      Alert.alert('Email Required', 'Please enter your email address first.');
+      setForgotStatus({
+        kind: 'error',
+        message: 'Type your email above first, then tap "Forgot password?" again.',
+      });
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setForgotStatus({
+        kind: 'error',
+        message: 'That doesn’t look like a valid email address.',
+      });
+      return;
+    }
+    setForgotBusy(true);
     try {
       // redirectTo must be on the project's "Redirect URLs" allowlist in
-      // Supabase Auth settings, otherwise the email link will land on a
-      // generic error page. We send users back to /reset-password (handled
-      // by the web app via detectSessionInUrl + PASSWORD_RECOVERY event).
+      // Supabase Auth → URL Configuration. Match wildcards: /** is required.
       const redirectTo =
         Platform.OS === 'web' && typeof window !== 'undefined'
           ? `${window.location.origin}/?recovery=1`
           : 'wattsonev://reset-password';
+      console.log('[forgot-password] sending reset for', trimmed, '→', redirectTo);
       const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
         redirectTo,
       });
-      if (error) throw error;
-      Alert.alert(
-        'Password Reset',
-        'Check your email for a password reset link. The link is valid for 1 hour.',
-      );
+      if (error) {
+        console.error('[forgot-password] supabase error:', error);
+        throw error;
+      }
+      console.log('[forgot-password] success');
+      setForgotStatus({
+        kind: 'success',
+        message: `Sent. Check ${trimmed} for a reset link (valid 1 hour). Look in spam if you don’t see it.`,
+      });
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Could not send reset email.');
+      console.error('[forgot-password] caught:', err);
+      setForgotStatus({
+        kind: 'error',
+        message: err?.message || 'Could not send reset email. Try again in a minute.',
+      });
+    } finally {
+      setForgotBusy(false);
     }
   };
 
@@ -140,9 +170,18 @@ export function LoginScreen({ navigation }: any) {
             <View style={styles.fieldGroup}>
               <View style={styles.labelRow}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>Password</Text>
-                <TouchableOpacity onPress={handleForgotPassword}>
-                  <Text style={[styles.forgotLink, { color: colors.primary }]}>
-                    Forgot password?
+                <TouchableOpacity
+                  onPress={handleForgotPassword}
+                  disabled={forgotBusy}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text
+                    style={[
+                      styles.forgotLink,
+                      { color: forgotBusy ? colors.textTertiary : colors.primary },
+                    ]}
+                  >
+                    {forgotBusy ? 'Sending\u2026' : 'Forgot password?'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -159,6 +198,33 @@ export function LoginScreen({ navigation }: any) {
                   onBlur={() => setFocusedField(null)}
                 />
               </View>
+              {forgotStatus && (
+                <View
+                  style={[
+                    styles.statusBanner,
+                    {
+                      backgroundColor:
+                        forgotStatus.kind === 'success'
+                          ? '#00FF8815'
+                          : '#FF4D6A15',
+                      borderColor:
+                        forgotStatus.kind === 'success' ? '#00FF88' : '#FF4D6A',
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusText,
+                      {
+                        color:
+                          forgotStatus.kind === 'success' ? '#00FF88' : '#FF4D6A',
+                      },
+                    ]}
+                  >
+                    {forgotStatus.message}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Sign in button */}
@@ -248,6 +314,18 @@ const styles = StyleSheet.create({
   forgotLink: {
     ...typography.caption,
     fontSize: 13,
+  },
+  statusBanner: {
+    marginTop: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  statusText: {
+    ...typography.caption,
+    fontSize: 12,
+    lineHeight: 16,
   },
   // Input
   input: {
