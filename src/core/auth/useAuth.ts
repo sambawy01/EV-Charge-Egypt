@@ -4,7 +4,7 @@ import { authService } from './authService';
 import type { UserRole } from '../types/auth';
 
 export function useAuth() {
-  const { user, isAuthenticated, isLoading, setUser, setSession, clearUser, setLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading, setUser, setSession, clearUser } = useAuthStore();
 
   const signUp = useCallback(async (
     email: string,
@@ -28,16 +28,15 @@ export function useAuth() {
   }, [setUser]);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    setLoading(true);
-    try {
-      const { profile, session } = await authService.signIn(email, password);
-      setUser(profile);
-      setSession(session);
-      return profile;
-    } finally {
-      setLoading(false);
-    }
-  }, [setUser, setSession, setLoading]);
+    // Like signUp: deliberately does NOT touch the global `isLoading` flag. It
+    // gates the whole RootNavigator — flipping it here unmounts LoginScreen
+    // mid-request and destroys its error-banner state. LoginScreen owns its
+    // own local submit state instead.
+    const { profile, session } = await authService.signIn(email, password);
+    setUser(profile);
+    setSession(session);
+    return profile;
+  }, [setUser, setSession]);
 
   const signOut = useCallback(async () => {
     await authService.signOut();

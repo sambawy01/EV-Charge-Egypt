@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
@@ -23,29 +22,33 @@ export function LoginScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [forgotBusy, setForgotBusy] = useState(false);
-  /** Inline status surface for the forgot-password flow. RN's Alert.alert
-   *  no-ops in some react-native-web builds, so we render feedback in the
-   *  DOM directly. */
-  const [forgotStatus, setForgotStatus] = useState<
+  /** In-flight state for the Sign In button. Local on purpose — the global
+   *  auth `isLoading` flag gates the whole RootNavigator and would unmount
+   *  this screen mid-request. */
+  const [submitting, setSubmitting] = useState(false);
+  /** Inline status surface shared by the login and forgot-password flows.
+   *  RN's Alert.alert no-ops in react-native-web, so we render feedback in
+   *  the DOM directly instead of into a native alert nobody sees. */
+  const [status, setStatus] = useState<
     { kind: 'success' | 'error'; message: string } | null
   >(null);
-  const { signIn, isLoading } = useAuth();
+  const { signIn } = useAuth();
   const { colors } = useTheme();
 
   const handleForgotPassword = async () => {
     console.log('[forgot-password] tapped');
     if (forgotBusy) return; // prevent double-fire
-    setForgotStatus(null);
+    setStatus(null);
     const trimmed = email.trim();
     if (!trimmed) {
-      setForgotStatus({
+      setStatus({
         kind: 'error',
         message: 'Type your email above first, then tap "Forgot password?" again.',
       });
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-      setForgotStatus({
+      setStatus({
         kind: 'error',
         message: 'That doesn’t look like a valid email address.',
       });
@@ -68,13 +71,13 @@ export function LoginScreen({ navigation }: any) {
         throw error;
       }
       console.log('[forgot-password] success');
-      setForgotStatus({
+      setStatus({
         kind: 'success',
         message: `Sent. Check ${trimmed} for a reset link (valid 1 hour). Look in spam if you don’t see it.`,
       });
     } catch (err: any) {
       console.error('[forgot-password] caught:', err);
-      setForgotStatus({
+      setStatus({
         kind: 'error',
         message: err?.message || 'Could not send reset email. Try again in a minute.',
       });
@@ -84,14 +87,22 @@ export function LoginScreen({ navigation }: any) {
   };
 
   const handleLogin = async () => {
+    setStatus(null);
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setStatus({ kind: 'error', message: 'Please fill in your email and password.' });
       return;
     }
+    setSubmitting(true);
     try {
       await signIn(email, password);
+      // Success → RootNavigator switches into the app automatically.
     } catch (e: any) {
-      Alert.alert('Login Failed', e.message);
+      setStatus({
+        kind: 'error',
+        message: e?.message || 'Login failed. Please try again.',
+      });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -198,17 +209,17 @@ export function LoginScreen({ navigation }: any) {
                   onBlur={() => setFocusedField(null)}
                 />
               </View>
-              {forgotStatus && (
+              {status && (
                 <View
                   style={[
                     styles.statusBanner,
                     {
                       backgroundColor:
-                        forgotStatus.kind === 'success'
+                        status.kind === 'success'
                           ? '#00FF8815'
                           : '#FF4D6A15',
                       borderColor:
-                        forgotStatus.kind === 'success' ? '#00FF88' : '#FF4D6A',
+                        status.kind === 'success' ? '#00FF88' : '#FF4D6A',
                     },
                   ]}
                 >
@@ -217,11 +228,11 @@ export function LoginScreen({ navigation }: any) {
                       styles.statusText,
                       {
                         color:
-                          forgotStatus.kind === 'success' ? '#00FF88' : '#FF4D6A',
+                          status.kind === 'success' ? '#00FF88' : '#FF4D6A',
                       },
                     ]}
                   >
-                    {forgotStatus.message}
+                    {status.message}
                   </Text>
                 </View>
               )}
@@ -231,7 +242,7 @@ export function LoginScreen({ navigation }: any) {
             <Button
               title="Sign In"
               onPress={handleLogin}
-              loading={isLoading}
+              loading={submitting}
               size="lg"
               style={styles.signInButton}
             />
