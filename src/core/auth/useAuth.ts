@@ -12,20 +12,20 @@ export function useAuth() {
     fullName: string,
     role: UserRole,
   ) => {
-    setLoading(true);
-    try {
-      const result = await authService.signUp(email, password, fullName, role);
-      // Only authenticate when Supabase actually returned a session. When the
-      // result is `confirm_email` the user has no session yet — RegisterScreen
-      // shows a "check your email" message instead of entering the app.
-      if (result.status === 'active') {
-        setUser(result.profile);
-      }
-      return result;
-    } finally {
-      setLoading(false);
+    // Deliberately does NOT touch the global `isLoading` flag. That flag gates
+    // the whole RootNavigator — flipping it here renders LoadingScreen, which
+    // unmounts AuthNavigator (and RegisterScreen with it), destroying the
+    // screen's error-banner state before it can render. In-flight submit state
+    // is owned locally by RegisterScreen instead.
+    const result = await authService.signUp(email, password, fullName, role);
+    // Only authenticate when Supabase actually returned a session. When the
+    // result is `confirm_email` the user has no session yet — RegisterScreen
+    // shows a "check your email" message instead of entering the app.
+    if (result.status === 'active') {
+      setUser(result.profile);
     }
-  }, [setUser, setLoading]);
+    return result;
+  }, [setUser]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     setLoading(true);

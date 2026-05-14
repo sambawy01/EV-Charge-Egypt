@@ -29,7 +29,10 @@ export function RegisterScreen({ navigation }: any) {
   const [status, setStatus] = useState<
     { kind: 'success' | 'error'; message: string } | null
   >(null);
-  const { signUp, isLoading } = useAuth();
+  /** In-flight submit state. Local on purpose — the global auth `isLoading`
+   *  flag gates the whole RootNavigator and would unmount this screen. */
+  const [submitting, setSubmitting] = useState(false);
+  const { signUp } = useAuth();
   const { colors } = useTheme();
 
   const handleRegister = async () => {
@@ -51,6 +54,7 @@ export function RegisterScreen({ navigation }: any) {
       return;
     }
 
+    setSubmitting(true);
     try {
       const result = await signUp(email, password, fullName.trim(), role);
       if (result.status === 'confirm_email') {
@@ -66,6 +70,8 @@ export function RegisterScreen({ navigation }: any) {
         kind: 'error',
         message: e?.message || 'Registration failed. Please try again.',
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -268,7 +274,7 @@ export function RegisterScreen({ navigation }: any) {
             <Button
               title="Create Account"
               onPress={handleRegister}
-              loading={isLoading}
+              loading={submitting}
               size="lg"
               style={styles.createButton}
             />
