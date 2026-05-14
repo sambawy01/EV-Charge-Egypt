@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  Alert,
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
@@ -24,30 +23,49 @@ export function RegisterScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('driver');
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  /** Inline status surface. RN's Alert.alert no-ops in react-native-web, so we
+   *  render validation errors, signup failures and the "check your email"
+   *  message directly in the DOM instead of into a native alert nobody sees. */
+  const [status, setStatus] = useState<
+    { kind: 'success' | 'error'; message: string } | null
+  >(null);
   const { signUp, isLoading } = useAuth();
   const { colors } = useTheme();
 
   const handleRegister = async () => {
+    setStatus(null);
+
     if (!fullName.trim()) {
-      Alert.alert('Name Required', 'Please enter your name.');
+      setStatus({ kind: 'error', message: 'Please enter your name.' });
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      setStatus({ kind: 'error', message: 'Please enter a valid email address.' });
       return;
     }
 
     if (password.length < 8) {
-      Alert.alert('Weak Password', 'Password must be at least 8 characters.');
+      setStatus({ kind: 'error', message: 'Password must be at least 8 characters.' });
       return;
     }
 
     try {
-      await signUp(email, password, fullName.trim(), role);
+      const result = await signUp(email, password, fullName.trim(), role);
+      if (result.status === 'confirm_email') {
+        // No session yet — the user must confirm their email before signing in.
+        setStatus({
+          kind: 'success',
+          message: `Almost there! We sent a confirmation link to ${result.email}. Tap it to activate your account, then sign in.`,
+        });
+      }
+      // result.status === 'active' → RootNavigator switches into the app.
     } catch (e: any) {
-      Alert.alert('Registration Failed', e.message);
+      setStatus({
+        kind: 'error',
+        message: e?.message || 'Registration failed. Please try again.',
+      });
     }
   };
 
@@ -221,6 +239,31 @@ export function RegisterScreen({ navigation }: any) {
               </View>
             </View>
 
+            {/* Inline status banner — validation errors, signup failures, or
+                the "check your email" confirmation message. */}
+            {status && (
+              <View
+                style={[
+                  styles.statusBanner,
+                  {
+                    backgroundColor:
+                      status.kind === 'success' ? '#00FF8815' : '#FF4D6A15',
+                    borderColor:
+                      status.kind === 'success' ? '#00FF88' : '#FF4D6A',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: status.kind === 'success' ? '#00FF88' : '#FF4D6A' },
+                  ]}
+                >
+                  {status.message}
+                </Text>
+              </View>
+            )}
+
             {/* Create account button */}
             <Button
               title="Create Account"
@@ -368,6 +411,18 @@ const styles = StyleSheet.create({
   createButton: {
     width: '100%',
     marginTop: spacing.sm,
+  },
+  // Inline status banner
+  statusBanner: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  statusText: {
+    ...typography.caption,
+    fontSize: 12,
+    lineHeight: 16,
   },
   // Bottom
   bottomLink: {

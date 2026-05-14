@@ -14,9 +14,14 @@ export function useAuth() {
   ) => {
     setLoading(true);
     try {
-      const profile = await authService.signUp(email, password, fullName, role);
-      setUser(profile);
-      return profile;
+      const result = await authService.signUp(email, password, fullName, role);
+      // Only authenticate when Supabase actually returned a session. When the
+      // result is `confirm_email` the user has no session yet — RegisterScreen
+      // shows a "check your email" message instead of entering the app.
+      if (result.status === 'active') {
+        setUser(result.profile);
+      }
+      return result;
     } finally {
       setLoading(false);
     }

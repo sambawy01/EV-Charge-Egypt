@@ -1,55 +1,37 @@
 import { supabase } from '../config/supabase';
-import type { UserProfile, UserRole } from '../types/auth';
+import type { UserProfile, UserRole, SignUpResult } from '../types/auth';
 
 export const authService = {
-  async signUp(email: string, password: string, fullName: string, role: UserRole): Promise<UserProfile> {
-    // Sign up with Supabase Auth
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+  async signUp(
+    email: string,
+    password: string,
+    fullName: string,
+    role: UserRole,
+  ): Promise<SignUpResult> {
+    // Sign up with Supabase Auth. The on_auth_user_created DB trigger creates
+    // the matching public.user_profiles row server-side, so we don't upsert it
+    // here. If signUp fails (e.g. a 500 "Error sending confirmation email" when
+    // confirmation is enabled but no SMTP is configured) the error is thrown so
+    // the caller can show it — we never swallow it.
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName, role } },
     });
-    if (authError) throw authError;
+    if (error) throw error;
 
-    // Supabase returns a fake user with empty identities when email already exists
-    // (to prevent email enumeration). Detect this and try sign-in instead.
-    const isRealUser = authData.user?.identities && authData.user.identities.length > 0;
-
-    if (!isRealUser) {
-      // Email already registered — try signing in with the password they provided
-      try {
-        const signInResult = await supabase.auth.signInWithPassword({ email, password });
-        if (signInResult.error) {
-          throw new Error('This email is already registered. Please sign in instead, or use a different email.');
-        }
-        // Sign in succeeded — fetch their existing profile
-        const { data: existingProfile } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', signInResult.data.user.id)
-          .single();
-        if (existingProfile) return existingProfile;
-        // No profile yet — create one
-        return {
-          id: signInResult.data.user.id,
-          role,
-          full_name: fullName,
-          phone: null,
-          avatar_url: null,
-          preferred_lang: 'en',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        } as UserProfile;
-      } catch (e: any) {
-        throw new Error(e.message || 'This email is already registered. Please sign in instead.');
-      }
+    // Supabase returns an obfuscated user with an empty `identities` array when
+    // the email is already registered (anti-enumeration). A genuine new signup
+    // always comes back with at least one identity.
+    const identities = data.user?.identities ?? [];
+    if (identities.length === 0) {
+      throw new Error(
+        'This email is already registered. Please sign in instead, or use a different email.',
+      );
     }
 
-    const userId = authData.user!.id;
-
-    // Build a local profile so we always have something to return
-    const localProfile: UserProfile = {
-      id: userId,
+    const profile: UserProfile = {
+      id: data.user!.id,
       role,
       full_name: fullName,
       phone: null,
@@ -57,21 +39,18 @@ export const authService = {
       preferred_lang: 'en',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-    } as UserProfile;
+    };
 
-    // Best-effort: persist profile in DB
-    try {
-      await supabase
-        .from('user_profiles')
-        .upsert({ id: userId, role, full_name: fullName }, { onConflict: 'id' });
-    } catch {}
+    // A session means email confirmation is OFF — the user is authenticated
+    // right now. onAuthStateChange (SIGNED_IN) also fires and syncs the store.
+    if (data.session) {
+      return { status: 'active', profile };
+    }
 
-    // Best-effort: auto sign-in (works when email confirmation is OFF)
-    try {
-      await supabase.auth.signInWithPassword({ email, password });
-    } catch {}
-
-    return localProfile;
+    // No session means email confirmation is ON. Do NOT fake a logged-in state
+    // (it has no DB access and dies on reload) — tell the caller to show a
+    // "check your email" message instead.
+    return { status: 'confirm_email', email };
   },
 
   async signIn(email: string, password: string): Promise<{ profile: UserProfile; session: any }> {
