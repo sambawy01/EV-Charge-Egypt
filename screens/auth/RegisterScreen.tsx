@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -34,6 +34,20 @@ export function RegisterScreen({ navigation }: any) {
   const [submitting, setSubmitting] = useState(false);
   const { signUp } = useAuth();
   const { colors } = useTheme();
+  const scrollRef = useRef<ScrollView>(null);
+
+  // The status banner renders below the form. On short viewports that pushes
+  // the Create Account button off-screen, so the user submits, sees nothing,
+  // and can't find the button to retry. Scroll the banner + button back into
+  // view whenever a status is set.
+  useEffect(() => {
+    if (!status) return;
+    const t = setTimeout(
+      () => scrollRef.current?.scrollToEnd({ animated: true }),
+      50,
+    );
+    return () => clearTimeout(t);
+  }, [status]);
 
   const handleRegister = async () => {
     setStatus(null);
@@ -109,6 +123,7 @@ export function RegisterScreen({ navigation }: any) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
+          ref={scrollRef}
           style={styles.flex}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
@@ -249,6 +264,8 @@ export function RegisterScreen({ navigation }: any) {
                 the "check your email" confirmation message. */}
             {status && (
               <View
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
                 style={[
                   styles.statusBanner,
                   {
